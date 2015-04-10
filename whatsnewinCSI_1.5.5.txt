@@ -1,3 +1,7 @@
+===============================
+What’s New in CSI Version 1.5.5
+===============================
+
 Upgraded to Image 1.48v from 1.47v
 Drag and drop DM3 and SER Files
 New color scheme default
