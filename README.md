@@ -14,7 +14,3 @@ Installing
 ----------
 
 Documentation coming soon...
-
-
-See Also:
-  [tomviz]: http://tomviz.org/ "The tomviz project"
