@@ -17,20 +17,25 @@ R.Sotto-Maior.Errata.Table 14.3:error in equation for Hanning windowing function
 Acknowledgement: The support from FAPEMIG (Fundacao de Amparo a Pesquisa de Minas Gerais) is gratefully acknowledged. 
 
 History: 2009/7/25:Firt version 
-
+2015/05/06: Robert Hovden edited.
 */
 
 macro "Hanning Window" {
 
+/*
 Dialog.create("Hanning Window");
 Dialog.addNumber("Window size:", 512);
 Dialog.show();
 size = Dialog.getNumber();
+*/
+
+M = getWidth();
+N = getHeight();
+im_data = getImageID();
 
 setBatchMode(true);
-newImage("Hanning Window", "32-bit Black", size, size, 1);
-M=size;
-N=size;
+newImage("Hanning Window", "32-bit Black", M, N, 1);
+im_window = getImageID();
 
 for (v=0; v<N; v++) {
 	showProgress(v, N);
@@ -46,5 +51,9 @@ for (v=0; v<N; v++) {
 			setPixel(u, v, 0);
 	}
 }
+
+imageCalculator("multiply", im_data, im_window);
+
 setBatchMode(false);
+
 }
