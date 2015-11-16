@@ -39,6 +39,7 @@ public class HandleExtraFileTypes extends ImagePlus implements PlugIn {
 			IJ.showStatus("");
 			return; // failed to load file or plugin has opened and displayed it
 		}
+
 		ImageStack stack = imp.getStack();
 		// get the title from the stack (falling back to the fileName)
 		String title=imp.getTitle().equals("")?fileName:imp.getTitle();
@@ -57,6 +58,7 @@ public class HandleExtraFileTypes extends ImagePlus implements PlugIn {
 			setDimensions(imp.getNChannels(), imp.getNSlices(), imp.getNFrames());
 		if (IJ.getVersion().compareTo("1.41o")>=0)
 			setOpenAsHyperStack(imp.getOpenAsHyperStack());
+         
 	}
 	
 
@@ -64,8 +66,9 @@ public class HandleExtraFileTypes extends ImagePlus implements PlugIn {
 		// set up a stream to read in 132 bytes from the file header
 		// These can be checked for "magic" values which are diagnostic
 		// of some image types
-		InputStream is;
+        InputStream is;
 		byte[] buf = new byte[132];
+        
 		try {
 			if (0 == path.indexOf("http://"))
 				is = new java.net.URL(path).openStream();
@@ -80,7 +83,7 @@ public class HandleExtraFileTypes extends ImagePlus implements PlugIn {
 		}
 		name = name.toLowerCase();
 		width = PLUGIN_NOT_FOUND;
-
+        
 		// Temporarily suppress "plugin not found" errors if LOCI Bio-Formats plugin is installed
 		if (Menus.getCommands().get("Bio-Formats Importer")!=null && IJ.getVersion().compareTo("1.37u")>=0)
 			IJ.suppressPluginNotFoundError();
