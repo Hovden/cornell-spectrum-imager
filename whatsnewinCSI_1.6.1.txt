@@ -2,7 +2,7 @@
 What’s New in CSI Version 1.6.1
 ===============================
 github friendly source code
-basic build-bot for jar releases
+basic build params for CSI releases
 
 ===============================
 What’s New in CSI Version 1.6.0

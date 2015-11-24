@@ -1,6 +1,6 @@
 <!-- Ant makefile for ImageJ -->
 
-<project name="ImageJ++CSI" default="run">
+<project name="ImageJ+CSI" default="run">
 
   <target name="compile" description="Compile everything.">
     <!-- First, ensure the build directory exists. -->
@@ -24,27 +24,25 @@
     <copy todir="build/macros"><fileset dir="macros"/></copy>
     <copy todir="build/plugins"><fileset dir="plugins"/></copy>
     <!-- Build ij.jar. -->
-    <jar jarfile="build/ij.jar" basedir="build"
+    <jar jarfile="build/ImageJ+CSI.jar" basedir="build"
          manifest="MANIFEST.MF" />
   </target>
 
 
   <target name="clean" description="Delete the build files.">
     <delete dir="build" />
-    <delete file="ij.jar" />
+    <delete file="ImageJ+CSI.jar" />
   </target>
 
 
   <target name="run" depends="build" description="Build and run ImageJ + CSI.">
-    <copy file="ij.jar" toDir=".." />
-    <java maxmemory="640m" jar="ij.jar" fork="yes" />
+    <java maxmemory="640m" jar="ImageJ+CSI.jar" fork="yes" />
   </target>
     
 
   <target name="run2" depends="build" description="Build and run ImageJ + CSI.">
     <!-- Run in ImageJ directory -->
-    <copy file="ij.jar" toDir=".." />
-    <java maxmemory="640m" dir=".." jar="ij.jar" fork="yes" />
+    <java maxmemory="640m" dir=".." jar="ImageJ+CSI.jar" fork="yes" />
   </target>
 
   <target name="zip" depends="clean" description="Build zrc.zip.">
@@ -70,5 +68,5 @@
   </target>
   
   
-   </project>
+</project>
 
