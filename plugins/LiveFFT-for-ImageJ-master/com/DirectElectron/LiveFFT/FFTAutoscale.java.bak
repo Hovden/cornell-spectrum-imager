@@ -1,0 +1,94 @@
+package com.DirectElectron.LiveFFT;
+
+import edu.emory.mathcs.parallelfftj.FloatTransformer;
+import edu.emory.mathcs.parallelfftj.FourierDomainOriginType;
+import edu.emory.mathcs.parallelfftj.SpectrumType;
+import edu.emory.mathcs.parallelfftj.Transformer;
+import ij.ImagePlus;
+import ij.ImageStack;
+
+/**
+ * Implements SerialEM's method for scaling the FFT values for display.
+ * 
+ * @sponsor Direct Electron (http://www.directelectron.com/)
+ * @author Sunny Chow (sunny.chow@acm.org)
+ */
+class FFTAutoscale implements FFTProcessor {
+	/* (non-Javadoc)
+	 * @see java.lang.Object#toString()
+	 */
+	public String toString()
+	{
+		return "Autoscale";
+	}
+	
+	/* (non-Javadoc)
+	 * @see FFTProcessor#process(ij.ImageStack)
+	 */
+	public ImagePlus process(ImageStack source, ImagePlus output) {
+		Transformer processor= new FloatTransformer(source, null);
+		processor.fft();
+		ImagePlus result = processor.toImagePlus(SpectrumType.POWER_SPECTRUM, FourierDomainOriginType.AT_CENTER);
+
+		// Get Raw data.
+		Object rawData = result.getStack().getProcessor(1).getPixels();
+		if (rawData instanceof float[])
+		{
+			float[] fdata = (float[])rawData;
+			
+			// Get the maximum value for the center image.
+			int cSz = result.getWidth() / 10;
+			int rSz = result.getHeight() / 10;
+			if (cSz < 2) cSz = 2;
+			if (rSz < 2) rSz = 2;
+			double maxVal = Double.MIN_VALUE;
+			int startR = result.getHeight() / 2;
+			int startC = result.getWidth() / 2;
+			int startInd = startR * result.getWidth();
+			for (int r = startR ; r < rSz + startR; r++)
+			{
+				for (int c = startC; c < cSz + startC; c++)
+				{
+					// Skip the zero value.
+					if (c == startC && 
+						r == startR) continue;
+					maxVal = (maxVal > fdata[startInd + c]) ? maxVal : fdata[startInd + c];
+				}
+				startInd += result.getWidth();
+			}	
+			
+			// Determine the mean of the border.
+			double sum = 0;
+			startInd = result.getWidth() * (result.getHeight() - 1);
+			for (int c = 0; c < result.getWidth(); c++)
+			{
+				sum += fdata[startInd + c];
+			}
+			double logScale = 0.5;
+			if (sum > 0)
+			{
+				logScale /= sum / result.getWidth();;
+			}
+			double scale = 256. / Math.log10(logScale * maxVal);
+			
+			startInd = 0;
+			for (int c = 0; c < result.getWidth() * result.getHeight(); c++)
+			{
+				fdata[c] = (float)(scale * Math.log10(logScale * fdata[c] + 1.));
+			}
+				
+			// Stretch Histogram by clipping via thresholding
+			// Seed the display range by 1, 256.  After that, the user is on his own.
+			if ( output.getProcessor() == null)
+			{
+				result.setDisplayRange(1, 256);
+			}
+			else
+			{
+				result.setDisplayRange(output.getProcessor().getMin(), output.getProcessor().getMax());
+			}
+		}
+
+		return result;
+	}
+}

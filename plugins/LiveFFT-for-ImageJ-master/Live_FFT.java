@@ -1,0 +1,559 @@
+import ij.*;
+
+import java.awt.Button;
+import java.awt.Label;
+import java.awt.Frame;
+import java.awt.Panel;
+import java.awt.Point;
+import java.awt.Rectangle;
+import java.awt.event.ActionEvent;
+import java.awt.event.ActionListener;
+import java.util.Hashtable;
+import java.util.Map;
+import java.util.Stack;
+
+import javax.swing.SwingUtilities;
+
+import ij.gui.Roi;
+import ij.plugin.*;
+import ij.process.ImageProcessor;
+import ij.process.StackProcessor;
+import edu.emory.mathcs.utils.ConcurrencyUtils;
+import com.DirectElectron.LiveFFT.*;
+
+/**
+ * ImageJ plugin that creates an interactive FFT display for the current image.  The 
+ * display is interactive in the sense that any changes to the current image will trigger
+ * an update to FFT display as well.  This includes changes in the ROI selection as well
+ * as updates to the image itself.  In addition, the plugin allows for the selection
+ * of different methods to map the FFT values for display.  The current methods that are
+ * supported are:
+ * 
+ * 1. Default : uses the method in SerialEM for mapping values for display.
+ * 2. Min/Max : maps the minimum and maximum values of the FFT to 1-256
+ * 3. Mean & Std Deviation: maps +- 3 std deviations of the mean of the FFT to 1-256
+ * 
+ * Dependencies:
+ * This project expects the following packages to be installed.
+ * 1. ParallelFFTJ (http://sites.google.com/site/piotrwendykier/software/parallelfftj)
+ * 2. Parallel Colt (http://sites.google.com/site/piotrwendykier/software/parallelcolt)
+ * 
+ * @sponsor Direct Electron (http://www.directelectron.com/)
+ * @author Sunny Chow (sunny.chow@acm.org)
+ */
+public class Live_FFT implements PlugIn, ImageListener, ROIListener, ActionListener {
+	private static final String FFT_POWER_SPECTRUM_TITLE = "FFT Power Spectrum";
+	private ImagePlus output;
+	private ImagePlus input;
+	private Panel buttonPanel;
+	private Button btnDisable;
+	private Button btnOptions;
+	private Button btnBinning;
+	private Button btnShowDisplay;
+	private Label status;
+	private ROIObserver observer;
+	private LiveFFTOptionsDlg optionsDlg;
+	private FFTProcessor fft;
+	private int binFactor;
+	private static Map<ImagePlus, Live_FFT> activeInstances;
+	private static Map<ImagePlus, ImagePlus> inputToOutput;
+	private FFTMainThread runner;
+	private boolean closed;
+   private boolean resetDisplayLoc;
+	
+	/**
+	 * Used to keep track of image to Live_FFT mappings to maintain a 1-1 relationship.
+	 */
+	static
+	{
+		activeInstances = new Hashtable<ImagePlus, Live_FFT>();
+		inputToOutput = new Hashtable<ImagePlus, ImagePlus>();
+	}
+	
+	/**
+	 * Creates an instance of Live_FFT and attaches it to the the active image.
+	 */
+	public Live_FFT()
+	{
+		this.optionsDlg = new LiveFFTOptionsDlg();
+
+		// Initialize GUI elements
+		this.buttonPanel = new Panel();
+		this.btnDisable = new Button("Disable Live FFT");
+		this.btnOptions = new Button("Live FFT Options");
+		this.btnBinning = new Button("2x binning");
+		this.btnShowDisplay = new Button("Show FFT Transform");
+		this.status = new Label("Processing FFT Transform");
+
+		this.btnDisable.addActionListener(this);
+		this.btnOptions.addActionListener(this);
+		this.btnShowDisplay.addActionListener(this);
+		this.btnBinning.addActionListener(this);
+		this.btnShowDisplay.setVisible(false);
+		this.status.setVisible(false);
+		this.closed = false;
+        this.resetDisplayLoc = true;
+        this.binFactor = 1;
+	}
+	
+	/* (non-Javadoc)
+	 * @see ij.plugin.PlugIn#run(java.lang.String)
+	 */
+	public void run(String arg) 
+	{
+		this.cleanupStructures();
+		ImagePlus img = IJ.getImage();
+		if (img == null )
+		{
+			IJ.error("Open or Capture an Image before running Live FFT");
+			return;
+		}
+		// check to see if this current image already has Live FFT attached to it.
+		if (Live_FFT.activeInstances.containsKey(img))
+		{
+			Live_FFT.activeInstances.get(img).resetDisplay();
+			return;
+		}
+		
+		if (img.getWindow().getTitle().contains(FFT_POWER_SPECTRUM_TITLE))
+		{
+			IJ.error("Live FFT cannot be added to power spectrum images.  Please select another image prior to running Live FFT.");
+			return;
+		}
+
+		this.input = img;
+		// Use the same output window if one already exists.
+		if (Live_FFT.inputToOutput.containsKey(img))
+		{
+			this.output = Live_FFT.inputToOutput.get(img);
+		}
+		else
+		{
+			this.output = new ImagePlus();
+         this.output.setTitle(input.getTitle() + " " + FFT_POWER_SPECTRUM_TITLE);
+			Live_FFT.inputToOutput.put(this.input, this.output);
+		}
+		Live_FFT.activeInstances.put(img, this);
+		
+		this.setParameters();
+		
+		// Attach this class via hooks to the current image.
+		ImagePlus.addImageListener(this);
+		observer = new ROIObserver(IJ.getImage());
+		observer.addListener(this);
+		
+		this.attachGUI(input.getWindow());
+
+		this.resetDisplay();
+	}
+
+	/**
+	 * Used to regularly clean up the references in inputToOutput to input images.  We
+	 * have to do this since once this plugin is closed, we no longer have any way of knowing
+	 * whether to release a reference to the input image, yet we're responsible for 
+	 * maintaining input to ouput image mappings for a better user experience.
+	 */
+	public void cleanupStructures() {
+		Stack<ImagePlus> toRemove = new Stack<ImagePlus>();
+		for (Map.Entry<ImagePlus, ImagePlus> entry : Live_FFT.inputToOutput.entrySet())
+		{
+			// our criteria for determining whether an input image can be disposed
+			// of is whether is if it no longer has a window. 
+			if (entry.getKey().getWindow() == null) 
+				toRemove.push(entry.getKey()); 
+		}
+
+      while (!toRemove.empty())
+			Live_FFT.inputToOutput.remove(toRemove.pop());
+
+	}
+	/**
+	 * Used to add GUI elements in the AWT thread.
+	 * 
+	 * @param frame
+	 */
+	public void attachGUI(Frame frame)	
+	{	
+		this.buttonPanel.add(btnDisable);
+		this.buttonPanel.add(btnOptions);
+		this.buttonPanel.add(btnBinning);
+		this.buttonPanel.add(btnShowDisplay);
+		this.buttonPanel.add(status);
+		
+		// Attach gui to image window.
+		frame.add(this.buttonPanel);
+		frame.pack();
+	}
+
+	public void outputHidden() {
+		if (this.output.getWindow() != null)
+		{
+			this.btnShowDisplay.setVisible(true);
+			this.input.getWindow().pack();
+			this.runner.Stop();
+		}
+	}
+
+	/**
+	 * Updates the current FFT display as a result of image changes or user input.
+	 */
+	public void resetDisplay() {
+		Roi roi = this.input.getRoi();
+		Rectangle rect;
+
+		if (roi != null)
+		{
+			rect = this.input.getRoi().getBounds();
+		}
+		else // Set one up anyways.
+		{
+
+			rect = new Rectangle(0, 0, this.input.getWidth(), this.input.getHeight());
+			
+			if (this.input.getWidth() > 1024 && this.input.getHeight() > 1024)
+			{
+				rect = new Rectangle(
+						(this.input.getWidth() - 1024 ) / 2,
+						(this.input.getHeight() - 1024 ) / 2,
+						1024,
+						1024
+				);
+			}
+			
+			this.input.setRoi(rect);
+		}
+		if (this.runner == null || !this.runner.isAlive())
+		{
+			this.runner =  new FFTMainThread();
+			this.runner.start();
+		}
+		
+      this.resetDisplayLoc = true;
+		this.applyTransform(this.input);	
+	}
+
+	/**
+	 * Takes the given image and the given parameters and runs the Fast Fourier Transform on it.
+	 * 
+	 * @param imp
+	 */
+	public void applyTransform(ImagePlus imp)
+	{
+		this.runner.NewFrameRequested();
+	}
+
+	/**
+	 * Updates the actual display.  Need to be synced with displayFrame and quit.
+	 */
+	public synchronized void displayFrame()
+	{
+		if (this.closed)
+			return;
+
+		// Show image.
+		this.output.show();
+
+		// Update button
+		if (btnShowDisplay.isVisible())
+		{
+			this.btnShowDisplay.setVisible(false);
+			this.input.getWindow().pack();
+		}
+
+		// Lastly set the location of the output window
+		// Offset output so that it is visible.
+		if (this.resetDisplayLoc && this.output.getWindow() != null)
+		{
+			this.output.getWindow().setLocation(
+				new Point(
+					this.input.getWindow().getLocation().x + this.input.getWindow().getSize().width,
+					this.input.getWindow().getLocation().y));
+         this.resetDisplayLoc = false;
+		}
+	}
+	
+	/**
+	 * Updates any error messages.  Needs to be synced with displayFrame and quit.
+	 */
+	public synchronized void finishedFrame()
+	{
+		// Show any errors if there are any.
+		if (this.runner.error != null)
+		{
+			IJ.error("Error in FFT thread", this.runner.error);
+			this.quit();
+		}
+	}
+
+	/**
+	 * Cleanly closes this application and removes the mapping of this plugin to the associated
+	 * Image.
+	 */
+	public synchronized void quit() {
+		this.closed = true;
+		this.runner.Stop();
+
+		this.input.getWindow().remove(this.buttonPanel);
+		this.input.getWindow().pack();
+		Live_FFT.activeInstances.remove(this.input);
+		ImagePlus.removeImageListener(this);
+		this.observer.removeListener(this);
+		ConcurrencyUtils.shutdown();
+	}
+
+	/**
+	 * Must include even though we don't do anything with this.
+	 */
+	public void imageOpened(ImagePlus imp) { }
+
+	/* (non-Javadoc)
+	 * @see ij.ImageListener#imageClosed(ij.ImagePlus)
+	 */
+	public void imageClosed(ImagePlus imp) {
+		if (imp == this.input)
+		{
+			this.quit();
+		}
+		if (imp == this.output)
+		{
+			this.outputHidden();
+		}
+	}
+
+	/* (non-Javadoc)
+	 * @see ij.ImageListener#imageUpdated(ij.ImagePlus)
+	 */
+	public void imageUpdated(ImagePlus imp) {
+		if (this.input == imp)
+			this.applyTransform(imp);
+	}
+	/* (non-Javadoc)
+	 * @see ROIListener#roiUpdated(ij.ImagePlus)
+	 */
+	public void roiUpdated(ImagePlus imp) {
+		if (this.input == imp)
+			this.applyTransform(imp);  
+	}
+
+	/* (non-Javadoc)
+	 * @see java.awt.event.ActionListener#actionPerformed(java.awt.event.ActionEvent)
+	 */
+	public void actionPerformed(ActionEvent arg0) {
+		if (arg0.getSource() == this.btnDisable)
+		{
+			this.quit();
+		}
+		if (arg0.getSource() == this.btnOptions)
+		{
+			if (this.optionsDlg.showDialog())
+			{
+				this.setParameters();
+				if (this.input != null)
+					applyTransform(this.input);  
+			}
+		}
+		if (arg0.getSource() == this.btnShowDisplay)
+		{
+			this.resetDisplay();
+		}
+		if (arg0.getSource() == this.btnBinning)
+		{
+			if (this.binFactor == 1)
+			{
+				this.binFactor = 2;
+				this.btnBinning.setLabel("1x binning");
+			}
+			else 
+			{
+				this.binFactor = 1;
+				this.btnBinning.setLabel("2x binning");
+			}
+			this.applyTransform(this.input);
+		}
+	}
+
+	/**
+	 * Updates the parameters used to process the FFT from options dialog box.  
+	 */
+	private void setParameters() {
+		ConcurrencyUtils.setNumberOfThreads(this.optionsDlg.getNumberThreads());
+		this.fft = this.optionsDlg.getSelectedFFT();
+	}
+
+	/**
+	 * We don't want to run any of the fft operations in the awt thread.  Instead
+	 * we want one thread separate from the awt thread to manage running of the 
+	 * FFT threads. All Gui updates are done via the AWT thread in the class 
+	 * Live_FFT. Uses input, output and fft from parent class.  Previously, with
+	 * the memory limits in place, handling the fft transforms in the awt 
+	 * thread provided acceptable perforamnce.  However, once we started
+	 * performing FFT on images greater than 2k x 2k, the performance of the
+	 * ImageJ and Live_FFT began to suffer.  Isolating the fft processing to a 
+	 * different thread greatly helps the responsiveness of the application.
+	 */
+	public class FFTMainThread extends Thread  {
+		private volatile int requestedCount = 0;  
+		private volatile boolean stop = true;
+		private volatile String error = null;
+		
+		public boolean IsStopped() { return this.stop; }
+
+		/**
+		 * Stops the thread that is performing the updates. When this method returns, the thread
+		 * is stopped.
+		 */
+		public void Stop() { 	
+			if (this.isAlive())
+				this.stop = true; 
+			//synchronized(this.stopSignal)
+			//{
+			//	error = "No errors.";
+			//}
+		}
+
+		public void NewFrameRequested() { this.requestedCount++; }
+
+		/**
+		 * Background thread that processes fft requests until it has been stopped
+		 */
+		public void run ()
+		{
+			//synchronized(this.stopSignal) {
+				this.stop = false;
+				while (!this.stop)
+				{	
+					// Acquire resources.
+					if (this.requestedCount > 0)
+					{
+						try 
+						{
+							this.tryProcess();
+						}
+						catch (java.lang.OutOfMemoryError e)
+						{
+							 this.error = "Out of memory\n" + "Try assigning more memory to Java Virtual Machine (JVM)\n" + 
+									 "that runs ImageJ by appending the -Xmx<memory> parameter to call of JVM.\n" + 
+									 "Example: 'java -Xmx1200M -cp ij.jar ij.ImageJ' starts ImageJ with 1.2 GB.";
+							 break;
+						}
+						catch (Throwable e)
+						{
+							String stackTrace = "";
+							StackTraceElement[] ses =  e.getStackTrace();
+							for (int i = 0; i < ses.length; i++)
+								stackTrace += ses[i].toString() + "\n";
+		
+							this.error = "Error:" + e.getMessage() + "\n" + stackTrace;
+							break;
+						}
+						finally
+						{
+							SwingUtilities.invokeLater(new Runnable() { 
+								public void run() 
+								{ 
+									finishedFrame();
+								} 
+							} );
+						}
+					}
+					else
+					{
+						try { Thread.sleep(50); }
+						catch (Exception e) {}
+					}
+				}
+			//}
+		}
+	
+		/**
+		 * Tries to process only if the images are unlocked and available.
+		 */
+		private void tryProcess()
+		{
+			if (requestedCount > 0 && !input.isLocked() && !output.isLocked())
+			{
+				try 
+				{
+					// always set the requestedCount to 1 so that we always process
+					// the last requested image.
+					this.requestedCount = 1;
+					input.lockSilently();
+					output.lockSilently();
+					this.processOne();		
+					this.requestedCount--;
+				}
+				finally
+				{
+					input.unlock();
+					output.unlock();
+				}
+			}
+		}
+	
+		public void processOne()
+		{
+			// Make sure the ROI is valid.
+			if (input.getRoi() == null) return;
+	
+			Rectangle rect = input.getRoi().getBounds();
+			if (rect.x < 0)
+			{
+				rect.width += rect.x;
+				rect.x -= rect.x;
+			}
+			if (rect.y < 0)
+			{
+				rect.height += rect.y;
+				rect.y -= rect.y;
+			}
+			if (rect.width + rect.x > input.getWidth())
+			{
+				int diff = rect.width + rect.x -input.getWidth();
+				rect.width -= diff;
+			}
+			if (rect.height + rect.y> input.getHeight())
+			{
+				int diff = rect.height + rect.y - input.getHeight();
+				rect.height -= diff;
+			}
+			if (rect.height <= 16 || rect.width <= 16) return;
+
+			// Start Processing
+			ImageStack stack = new ImageStack(input.getWidth(), input.getHeight());
+			ImageProcessor proc =  input.getStackSize() > 1 ?
+					input.getStack().getProcessor(input.getStackSize()-1) :
+					input.getProcessor();
+			stack.addSlice("last image", proc);
+			StackProcessor sp = new StackProcessor(stack, null);
+			ImageStack cropped = sp.crop(rect.x, rect.y, rect.width, rect.height);
+	
+			ImagePlus result = fft.process(cropped, output);
+	
+			// Scale the image so that it is square.
+			result.getProcessor().setInterpolationMethod(ImageProcessor.BICUBIC);
+			int width = result.getProcessor().getWidth();
+			int height = result.getProcessor().getHeight();
+			int newD = width < height? width : height ;
+			ImageProcessor scaled = result.getProcessor().resize(newD, newD);
+			if (binFactor != 1)
+				scaled = scaled.resize(newD/binFactor, newD/binFactor);
+			output.setProcessor(null, scaled);
+	
+			// Set up output window to fake ImageJ into calculating the Radius and Theta from the Center.
+			output.setCalibration(input.getCalibration());
+			output.setProperty("FHT", 1);
+
+			// Garbage collect.
+			System.gc();
+			
+			// Successfully finished so display frame
+			SwingUtilities.invokeLater(new Runnable() { 
+				public void run() 
+				{ 
+					displayFrame();
+				} 
+			} );
+		}
+	}
+}
+
