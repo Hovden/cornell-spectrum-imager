@@ -3,8 +3,6 @@
 Cornell Spectrum Imager (CSI)
 ======
  
-We are currently migrating to github. For now, please visit its temporary home: https://code.google.com/p/cornell-spectrum-imager/
- 
 [JOIN our Mailing List](http://eepurl.com/blODF9): The best way to learn about new CSI versions is through our mailing list. We promise not to share your information with any third party. We will RARELY send you email updates so don't worry about getting spammed weekly. By joining our mailing list, YOU ARE SIGNIFICANTLY HELPING us directly communicate to people interested in this project. Thank you.
  
 Introduction
