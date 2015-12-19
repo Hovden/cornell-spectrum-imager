@@ -30,7 +30,7 @@ You should also increase the allocated memory after installing by selecting `Edi
 Usage
 ------------
 
-Importing and Exporting Data
+**Importing and Exporting Data**
 
 How do I read a Gatan .dm3 or FEI/Emispec .ser file?
 
@@ -52,9 +52,9 @@ Principal Components Analysis (PCA)
 
 Why is it taking so long?
 
-We are using UJMP's Singular Value Decomposition for our PCA. For a window with N channels, this diagonalizes a matrix with 2N dimensions, an operation that scales as O(N^3). This means that doubling the window size will take 8 times as long and increasing the window size by a factor of 10 will take 1000 times as long. The lesson is to start with a small window (<20 channels) and see how long it takes, before getting ambitious. There are faster algorithms for extracting the first few PCA's and someday we may implement them.
+We are using UJMP's Singular Value Decomposition for our PCA. For a window with N channels, this diagonalizes a matrix with 2N dimensions, an operation that scales as O(N^3). This means that doubling the window size will take 8 times as long and increasing the window size by a factor of 10 will take 1000 times as long. The lesson is to start with a small window (<20 channels) and see how long it takes, before getting ambitious. There are faster algorithms for extracting the first few PCAs and someday we may implement them.
 
-General Troubleshooting
+**General Troubleshooting**
 
 I click on a button and nothing happens
 
