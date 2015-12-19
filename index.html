@@ -3,7 +3,7 @@
   <head>
     <meta charset="utf-8">
     <meta http-equiv="X-UA-Compatible" content="chrome=1">
-    <title>Cornell Spectrum Imager by Hovden</title>
+    <title>Cornell Spectrum Imager (CSI) by Hovden</title>
 
     <link rel="stylesheet" href="stylesheets/styles.css">
     <link rel="stylesheet" href="stylesheets/github-light.css">
@@ -15,8 +15,8 @@
   <body>
     <div class="wrapper">
       <header>
-        <h1>Cornell Spectrum Imager</h1>
-        <p></p>
+        <h1>Cornell Spectrum Imager (CSI)</h1>
+        <p>Hyperspectral Data Analysis with ImageJ</p>
 
         <p class="view"><a href="https://github.com/Hovden/cornell-spectrum-imager">View the Project on GitHub <small>Hovden/cornell-spectrum-imager</small></a></p>
 
@@ -28,30 +28,60 @@
         </ul>
       </header>
       <section>
-        <h3>
-<a id="welcome-to-github-pages" class="anchor" href="#welcome-to-github-pages" aria-hidden="true"><span class="octicon octicon-link"></span></a>Welcome to GitHub Pages.</h3>
+        <p><a href="http://eepurl.com/blODF9">JOIN our Mailing List</a>: The best way to learn about new CSI versions is through our mailing list. We promise not to share your information with any third party. We will RARELY send you email updates so don't worry about getting spammed weekly. By joining our mailing list, YOU ARE SIGNIFICANTLY HELPING us directly communicate to people interested in this project. Thank you.</p>
 
-<p>This automatic page generator is the easiest way to create beautiful pages for all of your projects. Author your page content here <a href="https://guides.github.com/features/mastering-markdown/">using GitHub Flavored Markdown</a>, select a template crafted by a designer, and publish. After your page is generated, you can check out the new <code>gh-pages</code> branch locally. If you’re using GitHub Desktop, simply sync your repository and you’ll see the new branch.</p>
+<h2>
+<a id="introduction" class="anchor" href="#introduction" aria-hidden="true"><span class="octicon octicon-link"></span></a>Introduction</h2>
 
-<h3>
-<a id="content" class="anchor" href="#content" aria-hidden="true"><span class="octicon octicon-link"></span></a>Content</h3>
+<p>Cornell Spectrum Imager is a free, open-source software tool for spectral analysis written by <a href="http://www.paulcueva.com/">Paul Cueva</a>, <a href="http://www.roberthovden.com">Robert Hovden</a> and <a href="http://muller.research.engineering.cornell.edu/">David Muller</a> from Cornell's School of Applied and Engineering Physics.</p>
 
-<p>Coming soon.</p>
+<p>An overview of the tool can be found in the article "The Open-Source Cornell Spectrum Imager", Paul Cueva, Robert Hovden, Julia A. Mundy, David A. Muller, <strong>Microscopy Today 21</strong>, 40-45 (2013). <a href="https://dx.doi.org/10.1017/S1551929512000995">DOI: 10.1017/S1551929512000995</a></p>
 
-<h3>
-<a id="creating-pages-manually" class="anchor" href="#creating-pages-manually" aria-hidden="true"><span class="octicon octicon-link"></span></a>Creating pages manually</h3>
+<p>If this software is used in published research, please cite: "Data Processing For Atomic Resolution EELS", Paul Cueva, Robert Hovden, Julia A. Mundy, Huolin L. Xin, David A. Muller, Microscopy and Microanalysis 18, 667-675 (2012) <a href="http://journals.cambridge.org/action/displayAbstract?fromPage=online&amp;aid=8653673">DOI:10.1017/S1431927612000244</a></p>
 
-<p>If you prefer to not use the automatic generator, push a branch named <code>gh-pages</code> to your repository to create a page manually. In addition to supporting regular HTML content, GitHub Pages support Jekyll, a simple, blog aware static site generator. Jekyll makes it easy to create site-wide headers and footers without having to copy them across every page. It also offers intelligent blog support and other advanced templating features.</p>
+<h2>
+<a id="installation" class="anchor" href="#installation" aria-hidden="true"><span class="octicon octicon-link"></span></a>Installation</h2>
 
-<h3>
-<a id="authors-and-contributors" class="anchor" href="#authors-and-contributors" aria-hidden="true"><span class="octicon octicon-link"></span></a>Authors and Contributors</h3>
+<p><a href="https://storage.googleapis.com/google-code-archive-downloads/v1/code.google.com/cornell-spectrum-imager/ImageJ+CSI_v1.5.dmg">Download ImageJ and CSI for Mac</a></p>
 
-<p>You can <a href="https://github.com/blog/821" class="user-mention">@mention</a> a GitHub username to generate a link to their profile. The resulting <code>&lt;a&gt;</code> element will link to the contributor’s GitHub Profile. For example: In 2007, Chris Wanstrath (<a href="https://github.com/defunkt" class="user-mention">@defunkt</a>), PJ Hyett (<a href="https://github.com/pjhyett" class="user-mention">@pjhyett</a>), and Tom Preston-Werner (<a href="https://github.com/mojombo" class="user-mention">@mojombo</a>) founded GitHub.</p>
+<p><a href="https://storage.googleapis.com/google-code-archive-downloads/v1/code.google.com/cornell-spectrum-imager/CSI%20v1.5%20(64bit).exe">Download ImageJ and CSI for Windows 64bit</a> (<a href="https://storage.googleapis.com/google-code-archive-downloads/v1/code.google.com/cornell-spectrum-imager/CSI%20v1.5%20(32bit).exe">32bit</a>) (On Windows 7 or Vista, don't install in 'Program Files', but a directory that has write permissions, like 'Documents'.)</p>
 
-<h3>
-<a id="support-or-contact" class="anchor" href="#support-or-contact" aria-hidden="true"><span class="octicon octicon-link"></span></a>Support or Contact</h3>
+<p><a href="https://storage.googleapis.com/google-code-archive-downloads/v1/code.google.com/cornell-spectrum-imager/CSI_v1.5%20source.zip">Download only the plugins</a></p>
 
-<p>Having trouble with Pages? Check out our <a href="https://help.github.com/pages">documentation</a> or <a href="https://github.com/contact">contact support</a> and we’ll help you sort it out.</p>
+<p>You should also increase the allocated memory after installing by selecting <code>Edit &gt; Options &gt; Memory &amp; Threads...</code></p>
+
+<h2>
+<a id="usage" class="anchor" href="#usage" aria-hidden="true"><span class="octicon octicon-link"></span></a>Usage</h2>
+
+<p><strong>Importing and Exporting Data</strong></p>
+
+<p>How do I read a Gatan .dm3 or FEI/Emispec .ser file?</p>
+
+<p>Click on the Open Spectrum Icon on the ImageJ CSI toolset bar (the yellow folder icon). You can also use the plugins directly at the menu Plugins..CSI.. if you have another toolset active. At present, ImageJ's own File..Open menu is not smart enough to read the Spectrum Image versions of Gatan or FEI files.</p>
+
+<p>How do I save a spectrum image?</p>
+
+<p>A Spectrum Image is a calibrated image stack. To avoid losing information, we recommend saving it as a TIFF file. From the ImageJ menu, select FILE..Save As..Tiff... The file can now be read back into ImageJ. Digital Micrograph can also read the file, but will lose the calibration data.</p>
+
+<p>How do I read a spectrum image back into Digital Micrograph?</p>
+
+<p>Gatan has not yet chosen to disclose the internal format of .dm3 files. Until they do, we recommend saving your spectrum image as Tiff. This can then be read (slowly) into Digital Micrograph, where they will appear as image stacks. You will then have to select from the DM menu Spectrum..Convert Data to..EELS, and then calibrate the energy axis.</p>
+
+<p>How do I save a single spectrum?</p>
+
+<p>Click on the Save... Button below the plot in the CSI:Cornell Spectrum Imager Window. This will save the energy axis and all plotted lines as a tab-separated text file.</p>
+
+<p>Principal Components Analysis (PCA)</p>
+
+<p>Why is it taking so long?</p>
+
+<p>We are using UJMP's Singular Value Decomposition for our PCA. For a window with N channels, this diagonalizes a matrix with 2N dimensions, an operation that scales as O(N^3). This means that doubling the window size will take 8 times as long and increasing the window size by a factor of 10 will take 1000 times as long. The lesson is to start with a small window (&lt;20 channels) and see how long it takes, before getting ambitious. There are faster algorithms for extracting the first few PCAs and someday we may implement them.</p>
+
+<p><strong>General Troubleshooting</strong></p>
+
+<p>I click on a button and nothing happens</p>
+
+<p>ImageJ is likely out of memory, and not able to add new windows. You should increase the amount of memory available to imageJ by selecting Edit&gt;Options&gt;Memory, increasing the allocated memory and restarting the program. For very large data sets be sure to use the 64-bit version (e.g ImageJ64.app on the Mac), which is found in the ImageJ program folder.</p>
       </section>
       <footer>
         <p>This project is maintained by <a href="https://github.com/Hovden">Hovden</a></p>
