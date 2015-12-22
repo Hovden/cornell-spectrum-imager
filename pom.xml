@@ -3,7 +3,7 @@
 	<modelVersion>4.0.0</modelVersion>
 	<groupId>org.csi</groupId>
 	<artifactId>csi</artifactId>
-	<version>0.0.1-SNAPSHOT</version>
+	<version>1.0.0</version>
 	<name>Cornell Spectrum Imager</name>
 	<build>
 		<sourceDirectory>src</sourceDirectory>
@@ -28,6 +28,65 @@
 					</archive>
 				</configuration>
 			</plugin>
+			<plugin>
+				<groupId>com.akathist.maven.plugins.launch4j</groupId>
+				<artifactId>launch4j-maven-plugin</artifactId>
+				<version>1.7</version>
+				<executions>
+					<execution>
+						<id>l4j-clui</id>
+						<phase>package</phase>
+						<goals>
+							<goal>launch4j</goal>
+						</goals>
+						<configuration>
+							<headerType>console</headerType>
+							<outfile>target/csi.exe</outfile>
+							<jar>target/csi-1.0.0.jar</jar>
+							<errTitle>csi</errTitle>
+							<classPath>
+								<mainClass>ij.ImageJ</mainClass>
+								<addDependencies>true</addDependencies>
+								<preCp>anything</preCp>
+							</classPath>
+							<jre>
+								<minVersion>1.5.0</minVersion>
+								<opts>
+									<opt>-Djava.endorsed.dirs=./endorsed</opt>
+								</opts>
+							</jre>
+							<versionInfo>
+								<fileVersion>1.2.3.4</fileVersion>
+								<txtFileVersion>txt file version?</txtFileVersion>
+								<fileDescription>a description</fileDescription>
+								<copyright>my copyright</copyright>
+								<productVersion>4.3.2.1</productVersion>
+								<txtProductVersion>txt product version</txtProductVersion>
+								<productName>CSI</productName>
+								<internalName>ccne</internalName>
+								<originalFilename>original.exe</originalFilename>
+							</versionInfo>
+						</configuration>
+					</execution>
+				</executions>
+			</plugin>
+<!-- 			<plugin> -->
+<!-- 				<artifactId>maven-assembly-plugin</artifactId> -->
+<!-- 				<executions> -->
+<!-- 					<execution> -->
+<!-- 						<id>assembly</id> -->
+<!-- 						<phase>package</phase> -->
+<!-- 						<goals> -->
+<!-- 							<goal>attached</goal> -->
+<!-- 						</goals> -->
+<!-- 						<configuration> -->
+<!-- 							<descriptors> -->
+<!-- 								<descriptor>assembly.xml</descriptor> -->
+<!-- 							</descriptors> -->
+<!-- 						</configuration> -->
+<!-- 					</execution> -->
+<!-- 				</executions> -->
+<!-- 			</plugin> -->
 		</plugins>
 	</build>
 	<dependencies>
