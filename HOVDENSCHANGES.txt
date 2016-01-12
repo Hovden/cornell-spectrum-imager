@@ -1,3 +1,4 @@
+====================
 Changed GUI title
 Removed Items from HELP Menu (Simplified Help Menu)
 Added CSI Plugins
