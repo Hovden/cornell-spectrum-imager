@@ -1087,12 +1087,8 @@ public class CSI_Spectrum_Analyzer implements PlugInFilter {
 				}
 			}
 
-			try {
-				coeffs = m.solve(n);
-				Residual = m.times(coeffs).minus(n);
-			} catch (Exception e) {
-				return coeffs;
-			}
+			coeffs = m.solve(n);
+			this.Residual = m.mtimes(coeffs).minus(n);
 			return coeffs;
 		}
 
@@ -1109,6 +1105,8 @@ public class CSI_Spectrum_Analyzer implements PlugInFilter {
 	private class NoFit extends Fit {
 		@Override
 		Matrix createFit(double[] x, Matrix y, int start, int end) {
+			// No fit doesn't have a well-defined residual, so we're just using 0s
+			this.Residual = DenseMatrix.Factory.zeros(end - start, y.getColumnCount());
 			return DenseMatrix.Factory.zeros(2, y.getColumnCount());
 		}
 
@@ -1143,12 +1141,14 @@ public class CSI_Spectrum_Analyzer implements PlugInFilter {
 					n.setAsDouble(fy(y.getAsDouble(k + start, i)), k, i);
 				}
 			}
-			try {
-				coeffs = m.solve(n);
-			} catch (Exception e) {
-				return (DenseMatrix.Factory.ones(2, 1)).times(coeffs);
-			}
-			return (DenseMatrix.Factory.ones(2, 1)).times(coeffs);
+
+			coeffs = m.solve(n);
+			
+			// Basically stolen from the abstract class, since we don't really know
+			// how to define the residual for a constant fit
+			this.Residual = m.mtimes(coeffs).minus(n);
+			
+			return (DenseMatrix.Factory.ones(2, 1)).mtimes(coeffs);
 		}
 
 		protected double getFitAtX(double c0, double c1, double xi) {
@@ -1238,10 +1238,6 @@ public class CSI_Spectrum_Analyzer implements PlugInFilter {
 			Matrix m = DenseMatrix.Factory.zeros(s, 2);
 			Matrix n = DenseMatrix.Factory.zeros(s, col);
 			Matrix coeffs = DenseMatrix.Factory.zeros(2, col);
-			// ymin = (new JamaDenseDoubleMatrix2D(y)).getMinValue();
-			// if (ymin>1)
-			// ymin = 1;
-			// y.plusEquals(new Jama.Matrix(y.getRowDimension(), col, -ymin+1));
 
 			for (int k = 0; k < s; k++) {
 				m.setAsDouble(Math.pow(x[k + start], R1), k, 0);
@@ -1251,12 +1247,9 @@ public class CSI_Spectrum_Analyzer implements PlugInFilter {
 				}
 			}
 
-			try {
-				coeffs = m.solve(n);
-				Residual = m.times(coeffs).minus(n);
-			} catch (Exception e) {
-				return coeffs;
-			}
+			coeffs = m.solve(n);
+			this.Residual = m.mtimes(coeffs).minus(n);
+
 			return coeffs;
 		}
 
@@ -1990,26 +1983,33 @@ public class CSI_Spectrum_Analyzer implements PlugInFilter {
 			// coeffs.getArray()[1]);
 			// (new ImagePlus("coeff1",ipcoeff1 )).show();
 
-			for (int k = 0; k < size; k++) {
+			for (int k = 0; k < size; k++) 
+			{
 				updateProgress(k * 1.0 / (2 * size) + .5);
-				if (k < fitStart) {
+				if (k < fitStart) 
+				{
 					stacksub.addSlice(stack.getSliceLabel(k + 1),
 							stack.getProcessor(k + 1).createProcessor(width, height));
 				} else {
 					ipsub = stack.getProcessor(k + 1).duplicate();
 					stacksub.addSlice(stack.getSliceLabel(k + 1), ipsub);
-					if (k > fitStart && k < fitEnd) {
+					if (k > fitStart && k < fitEnd) 
+					{
 						ipresidual = stack.getProcessor(k + 1).duplicate();
 						stackresidual.addSlice(stack.getSliceLabel(k + 1), ipresidual);
 					}
-					for (int i = 0; i < width; i++) {
-						for (int j = 0; j < height; j++) {
+					for (int i = 0; i < width; i++) 
+					{
+						for (int j = 0; j < height; j++) 
+						{
 							pix = ipsub.getPixelValue(i, j)
 									- fit.getFitAtX(coeffs.getAsDouble(0, height * i + j), coeffs.getAsDouble(1, height * i + j), x[k]);
 							ipsub.putPixelValue(i, j, pix);
 							if (k > fitStart && k < fitEnd)
+							{
 								ipresidual.putPixelValue(i, j,
 										Math.exp(fit.Residual.getAsDouble(k - fitStart, height * i + j)));
+							}
 						}
 					}
 				}
