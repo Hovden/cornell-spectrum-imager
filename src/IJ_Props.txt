@@ -357,7 +357,12 @@ plug-in04=>"New_"
 plug-in05="Compile and Run...",ij.plugin.Compiler
 plug-in06="Install... [M]",ij.plugin.PluginInstaller
 plug-in07="CSI DM3 Reader",plugins.CSI.CSI_DM3_Reader
-#plug-in08=>"User_Plugins"
+plug-in08="CSI Map to Line",plugins.CSI.CSI_Map_to_Line
+plug-in09="CSI Darkref Subtractor",plugins.CSI.CSI_Darkref_Subtractor
+plug-in10="CSI TIA Reader",plugins.CSI.CSI_TIA_Reader
+plug-in11="CSI Spectrum Analyzer",plugins.CSI.CSI_Spectrum_Analyzer
+plug-in12="CSI Dynamic Profiler",plugins.CSI.Dynamic_Profiler
+#plug-in09=>"User_Plugins"
 
 # Install user plugins located in ij.jar to Plugins>User Plugins submenu
 #user_plugins01="Red And Blue",RedAndBlue_

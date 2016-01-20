@@ -169,7 +169,7 @@ public class CSI_Spectrum_Analyzer implements PlugInFilter {
 			return DONE; // Close plugin
 		}
 		this.img = img;
-		if (img.getRoi() == null) { // Check that image is present and a region
+		if (img != null && img.getRoi() == null) { // Check that image is present and a region
 									// is selected
 			if (img.getStackSize() == 1)
 				img.setRoi(new Rectangle(0, img.getHeight() / 2, img.getWidth(), 1));
@@ -1446,7 +1446,7 @@ public class CSI_Spectrum_Analyzer implements PlugInFilter {
 			 * and the number of rows that were in that "packed" matrix.
 			 * However, UJMP dropped this "feature" (for good reason).
 			 *
-			 * To remeedy this situation, we create an array that represents the same "packed" matrix as
+			 * To remedy this situation, we create an array that represents the same "packed" matrix as
 			 * y, but in our case it is in row-major order (SINCE THAT'S HOW JAVA WORKS!!!). We then use
 			 * that array to fill in our matrix.
 			 * 
@@ -1455,21 +1455,23 @@ public class CSI_Spectrum_Analyzer implements PlugInFilter {
 			 * Therefore, the number of columns is y.length / size
 			 * 
 			 *  - Pedro R (Imxset21), Dec 22 2015
+			 *  
+			 *  
+			 *  Fixed issue with incorrect numbering that caused spectrum analyzer to throw exception.
+			 *  Needed to revise function to unpack column organized matrix. 
+			 *  
+			 *  - Danielle L, Jan 19 2016
+			 *  
 			 */
 			final int y_num_cols = y.length / size;
 			Matrix tmp_mat = DenseMatrix.Factory.zeros(size, y_num_cols);
-			int tmp_mat_count = 0;
-			for (int i = 0; i < size; i++)
-			{
-				for (int j = 0; j < y_num_cols; j++)
-				{
-				    final long row = tmp_mat_count % y_num_cols;
-				    final long column = tmp_mat_count / y_num_cols;
-				    final long indx = row * size + column;
-				    tmp_mat.setAsDouble(y[(int) indx], row, column);
-					tmp_mat_count++;
-				}
-			}
+		    for (int i = 0; i < size; i++) 
+		    { 
+		    	for (int j = 0; j < y_num_cols; j++) 
+		    	{
+		    		tmp_mat.setAsDouble(y[(j * size) + i], i, j);
+		    	}
+		    }
 			
 			
 			Matrix coeffs = fit.createFit(
