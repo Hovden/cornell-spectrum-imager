@@ -1,7 +1,0 @@
-====================
-Changed GUI title
-Removed Items from HELP Menu (Simplified Help Menu)
-Added CSI Plugins
-Made histogram 20% larger.
-Made B&C 50% taller. << ContrastAdjuster.java
-Make b&c 100% wider, now samples twice as much in histogram << ContrastAdjuster.java

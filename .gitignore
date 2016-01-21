@@ -1,0 +1,7 @@
+# Ignores java/eclipse related items
+*.class
+.classpath
+.project
+.settings/
+target/
+/bin/
