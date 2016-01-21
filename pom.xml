@@ -14,6 +14,8 @@
 				<directory>${basedir}/src/</directory>
 				<includes>
 					<include>IJ_Props.txt</include>
+					<include>macros/*.txt</include>
+					<include>macros/*.ijm</include>
 				</includes>
 			</resource>
 		</resources>
