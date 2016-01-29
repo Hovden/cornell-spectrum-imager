@@ -10,6 +10,7 @@ import java.awt.event.MouseEvent;
 import java.awt.event.MouseListener;
 import java.io.File;
 import java.io.FileWriter;
+import java.io.IOException;
 
 import ij.IJ;
 import ij.ImagePlus;
@@ -51,7 +52,7 @@ class TestListener implements ActionListener, ItemListener, MouseListener {
 
 				// IJ.showMessage("Done");
 
-			} catch (Exception ex) {
+			} catch (NullPointerException | IOException ex) {
 				ex.printStackTrace();
 			}
 		} else if (b == this.csi_Spectrum_Analyzer.miAbout) { // Display 'About' information
@@ -68,54 +69,38 @@ class TestListener implements ActionListener, ItemListener, MouseListener {
 			}
 		} else if (b == this.csi_Spectrum_Analyzer.miTwoPointCalibration) {
 			if (!this.csi_Spectrum_Analyzer.isCalibrating) { // If not currently calibrating
-				this.csi_Spectrum_Analyzer.isCalibrating = true; // set twoppointcalibration mode to
-										// true
+				this.csi_Spectrum_Analyzer.isCalibrating = true; // set two ppoint calibration mode to true
 				this.csi_Spectrum_Analyzer.twoptcalib = true; // and add calibration GUI elements
-				this.csi_Spectrum_Analyzer.addCalibrateSliders(this.csi_Spectrum_Analyzer.panSliders, this.csi_Spectrum_Analyzer.panButtons);
+				this.csi_Spectrum_Analyzer.addCalibrateSliders(this.csi_Spectrum_Analyzer.panSliders,
+						this.csi_Spectrum_Analyzer.panButtons);
 				this.csi_Spectrum_Analyzer.state.pwin.pack();
 			} else {
 				if (!this.csi_Spectrum_Analyzer.twoptcalib) { // If currently calibrating, but not
-					this.csi_Spectrum_Analyzer.removeCalibrateSliders(this.csi_Spectrum_Analyzer.panSliders, this.csi_Spectrum_Analyzer.panButtons); // in
-																	// two
-																	// point
-																	// mode,
-																	// then
-																	// remove
+					this.csi_Spectrum_Analyzer.removeCalibrateSliders(this.csi_Spectrum_Analyzer.panSliders,
+							this.csi_Spectrum_Analyzer.panButtons); // in two point mode, then remove
+
 					this.csi_Spectrum_Analyzer.twoptcalib = true; // current calibration GUI elements
-					this.csi_Spectrum_Analyzer.addCalibrateSliders(this.csi_Spectrum_Analyzer.panSliders, this.csi_Spectrum_Analyzer.panButtons); // and
-																	// replace
-																	// with
-																	// two
-																	// point
-																	// GUI
-																	// elements
+
+					this.csi_Spectrum_Analyzer.addCalibrateSliders(this.csi_Spectrum_Analyzer.panSliders,
+							this.csi_Spectrum_Analyzer.panButtons); // and replace with two point GUI elements
+
 					this.csi_Spectrum_Analyzer.state.pwin.pack();
 				}
 			}
 			this.csi_Spectrum_Analyzer.state.updateProfile();
 		} else if (b == this.csi_Spectrum_Analyzer.miOnePointCalibration) {
 			if (!this.csi_Spectrum_Analyzer.isCalibrating) { // If not currently calibrating
-				this.csi_Spectrum_Analyzer.isCalibrating = true; // set onepointcalibration mode to
-										// true
+				this.csi_Spectrum_Analyzer.isCalibrating = true; // set one point calibration mode to true
 				this.csi_Spectrum_Analyzer.twoptcalib = false; // and add calibration GUI elements
 				this.csi_Spectrum_Analyzer.addCalibrateSliders(this.csi_Spectrum_Analyzer.panSliders, this.csi_Spectrum_Analyzer.panButtons);
 				this.csi_Spectrum_Analyzer.state.pwin.pack();
 			} else {
 				if (this.csi_Spectrum_Analyzer.twoptcalib) { // If currently calibrating, but not
 					this.csi_Spectrum_Analyzer.removeCalibrateSliders(this.csi_Spectrum_Analyzer.panSliders, this.csi_Spectrum_Analyzer.panButtons); // in
-																	// one
-																	// point
-																	// mode,
-																	// then
-																	// remove
+					// one point mode, then remove
 					this.csi_Spectrum_Analyzer.twoptcalib = false; // current calibration GUI elements
 					this.csi_Spectrum_Analyzer.addCalibrateSliders(this.csi_Spectrum_Analyzer.panSliders, this.csi_Spectrum_Analyzer.panButtons); // and
-																	// replace
-																	// with
-																	// one
-																	// point
-																	// GUI
-																	// elements
+					// replace with one point GUI elements
 					this.csi_Spectrum_Analyzer.state.pwin.pack();
 				}
 			}
@@ -125,7 +110,7 @@ class TestListener implements ActionListener, ItemListener, MouseListener {
 				FileWriter fw = new FileWriter(IJ.getDirectory("plugins") + "CSIconfig.txt");
 				fw.write((char) 49);
 				fw.close();
-			} catch (Exception ex) {
+			} catch (IOException ex) {
 			}
 			this.csi_Spectrum_Analyzer.colZeroLine = Color.red;
 			this.csi_Spectrum_Analyzer.colIntWindow = Color.white;
@@ -141,7 +126,7 @@ class TestListener implements ActionListener, ItemListener, MouseListener {
 				FileWriter fw = new FileWriter(IJ.getDirectory("plugins") + "CSIconfig.txt");
 				fw.write((char) 50);
 				fw.close();
-			} catch (Exception ex) {
+			} catch (IOException ex) {
 			}
 			this.csi_Spectrum_Analyzer.colZeroLine = Color.red;
 			this.csi_Spectrum_Analyzer.colIntWindow = Color.darkGray;
@@ -157,7 +142,7 @@ class TestListener implements ActionListener, ItemListener, MouseListener {
 				FileWriter fw = new FileWriter(IJ.getDirectory("plugins") + "CSIconfig.txt");
 				fw.write((char) 51);
 				fw.close();
-			} catch (Exception ex) {
+			} catch (IOException ex) {
 			}
 			this.csi_Spectrum_Analyzer.colZeroLine = new Color(128, 0, 0);
 			this.csi_Spectrum_Analyzer.colIntWindow = new Color(128, 128, 158);
@@ -173,7 +158,7 @@ class TestListener implements ActionListener, ItemListener, MouseListener {
 				FileWriter fw = new FileWriter(IJ.getDirectory("plugins") + "CSIconfig.txt");
 				fw.write((char) 52);
 				fw.close();
-			} catch (Exception ex) {
+			} catch (IOException ex) {
 			}
 			this.csi_Spectrum_Analyzer.colZeroLine = new Color(128, 0, 0);
 			this.csi_Spectrum_Analyzer.colIntWindow = new Color(128, 128, 158);

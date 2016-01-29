@@ -47,8 +47,9 @@ public class CSI_Darkref_Subtractor implements PlugIn {
     public void run(String arg) {
         imp = WindowManager.getCurrentImage();
         ImagePlus impsubbed = chooseSpectra();
-        if (impsubbed == null)
-            return;
+        if (impsubbed == null) {
+        	return;
+        }
         impsubbed.updateChannelAndDraw();
         impsubbed.resetDisplayRange();
         impsubbed.show();
@@ -64,12 +65,13 @@ public class CSI_Darkref_Subtractor implements PlugIn {
         String[] winNames = new String[winIDs.length];
         for (int i=0; i<winIDs.length; i++) {
             ImagePlus impi = WindowManager.getImage(winIDs[i]);
-            if (impi!=null)
+            if (impi!=null) {
                 winNames[i] = impi.getTitle();
-            else
+            } else {
                 winNames[i] = "";
+            }
         }
-
+        
         GenericDialog gd = new GenericDialog("Subtract Dark Reference");
         gd.addChoice("Spectrum:", winNames, winNames[0]);
         gd.addChoice("Dark Reference:", winNames, winNames[0]);

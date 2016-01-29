@@ -12,7 +12,9 @@ import java.awt.Label;
 import java.awt.Panel;
 import java.awt.Rectangle;
 import java.awt.TextField;
+import java.io.FileNotFoundException;
 import java.io.FileReader;
+import java.io.IOException;
 import java.util.Random;
 
 import javax.swing.BoxLayout;
@@ -28,6 +30,7 @@ import javax.swing.JPopupMenu;
 import javax.swing.JRadioButton;
 import javax.swing.JSlider;
 import javax.swing.UIManager;
+import javax.swing.UnsupportedLookAndFeelException;
 import javax.swing.plaf.metal.MetalLookAndFeel;
 
 import ij.IJ;
@@ -86,14 +89,14 @@ public class CSI_Spectrum_Analyzer implements PlugInFilter {
 	Panel panButtons, panCalibrateButtons, panSliders, panCalibrateL, panCalibrateR, panOver;
 	Label labIntegrate, labSubtract, labCalibrate, labEnergy1, labEnergy2, labEnergy3, labEnergy4, labHover1, labHover2;
 	TextField txtLeftCalibration, txtRightCalibration, txtEnergyCalibration, txtLeft, txtWidth, txtILeft, txtIWidth,
-			txtOversampling;
+	txtOversampling;
 	JMenuItem miTwoPointCalibration, miOnePointCalibration, miAbout, miDoc, miChangeColorCSI, miChangeColorCornell,
-			miChangeColorCollegiate, miChangeColorCorporate;
+	miChangeColorCollegiate, miChangeColorCorporate;
 	JPopupMenu pm;
 	JCheckBoxMenuItem miScaleCounts, miMeanCentering, miWeightedPCA;
 	JPanel panRad = new JPanel(), panAll = new JPanel();
 	Color colZeroLine, colIntWindow, colSubtracted, colData, colDataFill, colBackFill, colBackgroundFit,
-			colBackgroundWindow;
+	colBackgroundWindow;
 
 	/*
 	 * Load image data and start Cornell Spectrum Imager
@@ -107,58 +110,17 @@ public class CSI_Spectrum_Analyzer implements PlugInFilter {
 		}
 		try {
 			UIManager.setLookAndFeel(new MetalLookAndFeel()); // UIManager.getSystemLookAndFeelClassName());
-		} catch (Exception e) {
+		} catch (UnsupportedLookAndFeelException e) {
+			// may be unsupported in future
 		}
 
+		FileReader fr = null;
+		int c = 0;
 		try {
-			FileReader fr = new FileReader(IJ.getDirectory("plugins") + "CSIconfig.txt");
-			int c = fr.read();
-			switch (c) {
-
-			case 50:
-				colZeroLine = Color.red;
-				colIntWindow = Color.darkGray;
-				colSubtracted = Color.lightGray;
-				colData = Color.black;
-				colDataFill = new Color(179, 27, 27);
-				colBackFill = Color.white;
-				colBackgroundFit = Color.lightGray;
-				colBackgroundWindow = Color.gray;
-				break;
-			case 51:
-				colZeroLine = new Color(128, 0, 0);
-				colIntWindow = new Color(128, 128, 158);
-				colSubtracted = new Color(192, 192, 222);
-				colData = Color.black;
-				colDataFill = new Color(15, 77, 146);
-				colBackFill = new Color(255, 255, 244);
-				colBackgroundFit = new Color(255, 215, 0);
-				colBackgroundWindow = new Color(245, 205, 0);
-				break;
-			case 52:
-				colZeroLine = new Color(128, 0, 0);
-				colIntWindow = new Color(128, 128, 158);
-				colSubtracted = new Color(192, 192, 222);
-				colData = new Color(90, 190, 190);
-				colDataFill = new Color(90, 190, 190);
-				colBackFill = new Color(234, 234, 224);
-				colBackgroundFit = new Color(20, 150, 210);
-				colBackgroundWindow = new Color(20, 150, 210);
-				break;
-			default:
-				colZeroLine = Color.red;
-				colIntWindow = Color.white;
-				colSubtracted = Color.lightGray;
-				colData = Color.black;
-				colDataFill = Color.darkGray;
-				colBackFill = new Color(160, 165, 160);
-				colBackgroundFit = new Color(0, 128, 0);
-				colBackgroundWindow = new Color(128, 255, 128);
-				break;
-			}
+			fr = new FileReader(IJ.getDirectory("plugins") + "CSIconfig.txt");
+			c = fr.read();
 			fr.close();
-
-		} catch (Exception e) {
+		} catch (IOException e) {
 			colZeroLine = Color.red;
 			colIntWindow = Color.white;
 			colSubtracted = Color.lightGray;
@@ -169,23 +131,65 @@ public class CSI_Spectrum_Analyzer implements PlugInFilter {
 			colBackgroundWindow = new Color(128, 255, 128);
 		}
 
+		switch (c) {
+
+		case 50:
+			colZeroLine = Color.red;
+			colIntWindow = Color.darkGray;
+			colSubtracted = Color.lightGray;
+			colData = Color.black;
+			colDataFill = new Color(179, 27, 27);
+			colBackFill = Color.white;
+			colBackgroundFit = Color.lightGray;
+			colBackgroundWindow = Color.gray;
+			break;
+		case 51:
+			colZeroLine = new Color(128, 0, 0);
+			colIntWindow = new Color(128, 128, 158);
+			colSubtracted = new Color(192, 192, 222);
+			colData = Color.black;
+			colDataFill = new Color(15, 77, 146);
+			colBackFill = new Color(255, 255, 244);
+			colBackgroundFit = new Color(255, 215, 0);
+			colBackgroundWindow = new Color(245, 205, 0);
+			break;
+		case 52:
+			colZeroLine = new Color(128, 0, 0);
+			colIntWindow = new Color(128, 128, 158);
+			colSubtracted = new Color(192, 192, 222);
+			colData = new Color(90, 190, 190);
+			colDataFill = new Color(90, 190, 190);
+			colBackFill = new Color(234, 234, 224);
+			colBackgroundFit = new Color(20, 150, 210);
+			colBackgroundWindow = new Color(20, 150, 210);
+			break;
+		default:
+			colZeroLine = Color.red;
+			colIntWindow = Color.white;
+			colSubtracted = Color.lightGray;
+			colData = Color.black;
+			colDataFill = Color.darkGray;
+			colBackFill = new Color(160, 165, 160);
+			colBackgroundFit = new Color(0, 128, 0);
+			colBackgroundWindow = new Color(128, 255, 128);
+			break;
+		}
+
 		if (IJ.versionLessThan("1.46")) { // Check ImageJ version
 			IJ.error("Error starting CSI: Cornell Spectrum Imager", "ImageJ version is too old.");
 			return DONE; // Close plugin
 		}
-		
+
 		// Check that image is present and a region is selected
 		this.img = img;
-		if (img != null && img.getRoi() == null) 
-		{ 
-			if (img.getStackSize() == 1)
-			{
+		if (img != null && img.getRoi() == null) {
+			if (img.getStackSize() == 1) {
 				img.setRoi(new Rectangle(0, img.getHeight() / 2, img.getWidth(), 1));
 			} else {
 				img.setRoi(new Rectangle(0, 0, 10, 10));
 			}
 		}
-		
+
 		return DOES_ALL + NO_CHANGES;
 	}
 
@@ -193,15 +197,14 @@ public class CSI_Spectrum_Analyzer implements PlugInFilter {
 	 * Initialize variables and create windows.
 	 */
 	@Override
-	public void run(ImageProcessor ip) 
-	{
-		if (img.getStackSize() < 2) 
-		{
-			if (img.getHeight() < 2) 
-			{
-				state = new SpectrumData0D(this, img); // Spectrum data is single spectrum
+	public void run(ImageProcessor ip) {
+		if (img.getStackSize() < 2) {
+			if (img.getHeight() < 2) {
+				state = new SpectrumData0D(this, img); // Spectrum data is
+				// single spectrum
 			} else {
-				state = new SpectrumData1D(this, img); // Spectrum data is a linescan
+				state = new SpectrumData1D(this, img); // Spectrum data is a
+				// linescan
 			}
 		} else {
 			state = new SpectrumData2D(this, img); // Spectrum data is a 2D map
@@ -447,17 +450,11 @@ public class CSI_Spectrum_Analyzer implements PlugInFilter {
 			labHover2.setForeground(Color.red);
 		}
 		panAll.setLayout(new BoxLayout(panAll, BoxLayout.Y_AXIS));
-		// c = new GridBagConstraints();
-		// c.gridx = 0;
-		// c.gridy = 0;
+
 		panAll.add(zooming);
-		// c = new GridBagConstraints();
-		// c.gridx = 0;
-		// c.gridy = 1;
+
 		panAll.add(panButtons);
-		// c = new GridBagConstraints();
-		// c.gridx = 0;
-		// c.gridy = 2;
+
 		panAll.add(panSliders);
 		panAll.add(labHover1);
 		panAll.add(labHover2);

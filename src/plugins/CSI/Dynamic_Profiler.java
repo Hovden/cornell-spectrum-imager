@@ -40,7 +40,7 @@ import ij.util.Tools;
  * Version 2009-Jun-09: obeys 'fixed y axis scale' in Edit>Options>Profile Plot Options
  */
 public class Dynamic_Profiler
-        implements PlugIn, MouseListener, MouseMotionListener, KeyListener, ImageListener, Runnable {
+    implements PlugIn, MouseListener, MouseMotionListener, KeyListener, ImageListener, Runnable {
     //MouseListener, MouseMotionListener, KeyListener: to detect changes to the selection of an ImagePlus
     //ImageListener: listens to changes (updateAndDraw) and closing of an image
     //Runnable: for background thread
@@ -102,21 +102,23 @@ public class Dynamic_Profiler
     public void imageClosed(ImagePlus imp) {
         if (imp == this.imp || imp == plotImage) {
             removeListeners();
-            closePlotImage();                       //also terminates the background thread
+            closePlotImage();  //also terminates the background thread
         }
     }
 
     // the background thread for plotting.
     public void run() {
         while (true) {
-            IJ.wait(50);                            //delay to make sure the roi has been updated
+            IJ.wait(50);  //delay to make sure the roi has been updated
             ImageProcessor ip = getProfilePlot();
             if (ip != null) plotImage.setProcessor(null, ip);
             synchronized(this) {
                 if (doUpdate) {
-                    doUpdate = false;               //and loop again
+                    doUpdate = false;  //and loop again
                 } else {
-                    try {wait();}                   //notify wakes up the thread
+                    try {
+                    	wait();
+                    	}  //notify wakes up the thread
                     catch(InterruptedException e) { //interrupted tells the thread to exit
                         return;
                     }

@@ -16,6 +16,7 @@
 					<include>IJ_Props.txt</include>
 					<include>macros/*.txt</include>
 					<include>macros/*.ijm</include>
+					<include>images/CSI_prism.gif</include>
 				</includes>
 			</resource>
 		</resources>
