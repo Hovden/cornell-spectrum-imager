@@ -1,4 +1,4 @@
-![CSI Logo](/images/CSIlogo.png)
+![CSI Logo](/src/images/CSIlogo.png)
 
 Cornell Spectrum Imager (CSI)
 ======
