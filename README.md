@@ -65,13 +65,9 @@ ImageJ is likely out of memory, and not able to add new windows. You should incr
 [Paul Cueva]: http://www.paulcueva.com/
 [Robert Hovden]: http://www.roberthovden.com/
 [DOI]: https://dx.doi.org/DOI:10.1017/S1431927612000244
-[Download Mac]: https://storage.googleapis.com/google-code-archive-downloads/v1/code.google.com/cornell-spectrum-imager/ImageJ+CSI_v1.5.dmg
-[Download Win]: https://storage.googleapis.com/google-code-archive-downloads/v1/code.google.com/cornell-spectrum-imager/CSI%20v1.5%20(64bit).exe
-[Download 32bit]: https://storage.googleapis.com/google-code-archive-downloads/v1/code.google.com/cornell-spectrum-imager/CSI%20v1.5%20(32bit).exe
-[Download plugin]: https://storage.googleapis.com/google-code-archive-downloads/v1/code.google.com/cornell-spectrum-imager/CSI_v1.5%20source.zip
-[known bugs]: https://code.google.com/archive/p/cornell-spectrum-imager/issues
+[Download Mac]: ../../releases/download/1.5.0/ImageJ.CSI_v1.5.dmg
+[Download Win]: ../../releases/download/1.5.0/CSI.v1.5.64bit.exe
+[Download 32bit]: ../../releases/download/1.5.0/CSI.v1.5.32bit.exe
 [DOI2]: https://dx.doi.org/10.1017/S1551929512000995
 [FAQ]: https://code.google.com/archive/p/cornell-spectrum-imager/wikis/FrequentlyAskedQuestions.wiki
-[papers]: https://code.google.com/archive/p/cornell-spectrum-imager/wikis/PapersUsingCSI.wiki
 [IJ guide]: http://rsb.info.nih.gov/ij/docs/guide/user-guide.pdf
-[Muller Group]: http://research.engineering.cornell.edu/muller/csi.cfm
