@@ -21,8 +21,6 @@ Installation
 
 [Download ImageJ and CSI for Windows 64bit][Download Win] ([32bit][Download 32bit]) (On Windows 7 or Vista, don't install in 'Program Files', but a directory that has write permissions, like 'Documents'.)
 
-[Download only the plugins][Download plugin]
-
 You should also increase the allocated memory after installing by selecting `Edit > Options > Memory & Threads...`
 
 Usage
