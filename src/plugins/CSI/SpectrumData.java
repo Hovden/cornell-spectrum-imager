@@ -311,6 +311,8 @@ public abstract class SpectrumData implements MouseListener, MouseMotionListener
 	}
 
 	void positionPlotWindow() {
+        IJ.wait(200); //This helps reduce glitches
+        
 		if (pwin == null || img == null) {
 			return;
 		}
@@ -319,7 +321,7 @@ public abstract class SpectrumData implements MouseListener, MouseMotionListener
 			return;
 		}
 		Dimension screen = Toolkit.getDefaultToolkit().getScreenSize();
-		pwin.setSize(screen.width / 3, screen.height / 2); // SET the SIZE
+		pwin.setSize(screen.width / 3, screen.height / 4); // SET the SIZE
 															// of CSI WINDOW
 		// SETTING SIZE HERE, IS NOT ALWAYS CONSISTENT, THERE IS A BUG - RMH
 
@@ -329,14 +331,15 @@ public abstract class SpectrumData implements MouseListener, MouseMotionListener
 		if (plotSize.width == 0 || imageSize.width == 0) {
 			return;
 		}
+        
 		Point imageLoc = iwin.getLocation();
-		int w = imageLoc.x + imageSize.width + 10; // place window just
-													// right of spectrum
-													// data
-		if (w + plotSize.width > screen.width) {
-			w = screen.width - plotSize.width;
-		}
-		pwin.setLocation(w, imageLoc.y); // position window next to spectrum
+        int x = imageLoc.x + imageSize.width+10; //place window just right of spec
+        if (x + plotSize.width > screen.width)
+            x = screen.width - plotSize.width;
+        int y = imageLoc.y; //place vertically aligned with spec
+        if (y + plotSize.height > screen.height)
+            y = screen.height - plotSize.height;
+        pwin.setLocation(x, y); // position window next to spectrum
 		iwin.toFront();
 	}
 
