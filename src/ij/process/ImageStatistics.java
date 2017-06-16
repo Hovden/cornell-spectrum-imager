@@ -5,10 +5,15 @@ import java.awt.*;
 /** Statistics, including the histogram, of an image or selection. */
 public class ImageStatistics implements Measurements {
 
+	/** Use getHIstogram() to get histogram as long array. */
 	public int[] histogram;
+	/** Int pixel count (limited to 2^31-1) */
 	public int pixelCount;
+	/** Long pixel count */
 	public long longPixelCount;
+	/** Int mode (limited to 2^31-1) */
 	public int mode;
+	/** Double mode*/
 	public double dmode;
 	public double area;
 	public double min;
@@ -59,6 +64,12 @@ public class ImageStatistics implements Measurements {
 	EllipseFitter ef;
 
 	
+	/* Get uncalibrated statistics, including histogram, area, mean, 
+		min and max, standard deviation and mode. */
+	public static ImageStatistics getStatistics(ImageProcessor ip) {
+		return getStatistics(ip, AREA+MEAN+STD_DEV+MODE+MIN_MAX+RECT, null);
+	}
+
 	public static ImageStatistics getStatistics(ImageProcessor ip, int mOptions, Calibration cal) {
 		Object pixels = ip.getPixels();
 		if (pixels instanceof byte[])
@@ -276,6 +287,15 @@ public class ImageStatistics implements Measurements {
 	
 	public String toString() {
 		return "stats[count="+pixelCount+", mean="+mean+", min="+min+", max="+max+"]";
+	}
+	
+	protected void saveThreshold(double minThreshold, double maxThreshold, Calibration cal) {
+		if (cal!=null) {
+			minThreshold = cal.getCValue(minThreshold);
+			maxThreshold = cal.getCValue(maxThreshold);
+		}
+		lowerThreshold = minThreshold;
+		upperThreshold = maxThreshold;
 	}
 
 }

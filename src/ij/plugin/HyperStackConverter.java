@@ -86,7 +86,7 @@ public class HyperStackConverter implements PlugIn {
 		return imp2;
 	}
 		
-	/** Displays the current stack in a HyperStack window. Based on the 
+	/** Displays the specified stack in a HyperStack window. Based on the 
 		Stack_to_Image5D class in Joachim Walter's Image5D plugin. */
 	void convertStackToHS(ImagePlus imp) {
         int nChannels = imp.getNChannels();
@@ -216,7 +216,8 @@ public class HyperStackConverter implements PlugIn {
 	}
 
 	void convertHSToStack(ImagePlus imp) {
-		if (!imp.isHyperStack()) return;
+		if (!(imp.isHyperStack()||imp.isComposite()))
+			return;
 		ImagePlus imp2 = imp;
 		if (imp.isComposite()) {
 			ImageStack stack = imp.getStack();

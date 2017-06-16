@@ -2,7 +2,7 @@
  * This plugin implements the Edit/Selection/Create Selection command.
  * It is based on a proposal by Tom Larkworthy.
  * Written and public domained in June 2006 by Johannes E. Schindelin
- */
+*/
 package ij.plugin.filter;
 import ij.IJ;
 import ij.ImagePlus;
@@ -22,18 +22,22 @@ public class ThresholdToSelection implements PlugInFilter {
 	float min, max;
 	int w, h;
 	boolean showStatus;
-
+	final static double PROGRESS_FRACTION_OUTLINING = 0.9;  //fraction of progress bar for the first phase (tracing outlines)
+	
 	public void run(ImageProcessor ip) {
 		showStatus = true;
 		image.setRoi(convert(ip));
 	}
 	
+	/** Returns a selection created from the thresholded pixels in the
+		specified image, or null if there are no thresholded pixels. */
 	public static Roi run(ImagePlus imp) {
 		ThresholdToSelection tts = new ThresholdToSelection();
-		tts.image = imp;
 		return tts.convert(imp.getProcessor());
 	}
 	
+	/** Returns a selection created from the thresholded pixels in the
+		specified image, or null if there are no thresholded pixels. */
 	public Roi convert(ImageProcessor ip) {
 		this.ip = ip;
 		min = (float)ip.getMinThreshold();
@@ -283,19 +287,29 @@ public class ThresholdToSelection implements PlugInFilter {
 					}
 				}
 			}
-			if (showStatus && (y&progressInc)==0)
-				IJ.showProgress(y + 1, h + 1);
+			if (y%progressInc==0) {
+				if (Thread.currentThread().isInterrupted()) return null;
+				if (showStatus)
+					IJ.showProgress(y*(PROGRESS_FRACTION_OUTLINING/h));
+			}
 		}
-
-		//IJ.showStatus("Creating GeneralPath");
+		
+		if (polygons.size()==0)
+			return null;
+		if (showStatus) IJ.showStatus("Converting threshold to selection...");
 		GeneralPath path = new GeneralPath(GeneralPath.WIND_EVEN_ODD);
-		for (int i = 0; i < polygons.size(); i++)
+		progressInc = Math.max(polygons.size()/10, 1);
+		for (int i = 0; i < polygons.size(); i++) {
 			path.append((Polygon)polygons.get(i), false);
+			if (Thread.currentThread().isInterrupted()) return null;
+			if (showStatus && i%progressInc==0)
+				IJ.showProgress(PROGRESS_FRACTION_OUTLINING + i*(1.-PROGRESS_FRACTION_OUTLINING)/polygons.size());
+		}
 
 		ShapeRoi shape = new ShapeRoi(path);
 		Roi roi = shape!=null?shape.shapeToRoi():null; // try to convert to non-composite ROI
 		if (showStatus)
-			IJ.showProgress(1,1);
+			IJ.showProgress(1.0);
 		if (roi!=null)
 			return roi;
 		else
@@ -306,5 +320,9 @@ public class ThresholdToSelection implements PlugInFilter {
 		image = imp;
 		return DOES_8G | DOES_16 | DOES_32 | NO_CHANGES;
 	}
-}
 
+	/** Determines whether to show status messages and a progress bar */
+	public void showStatus(boolean showStatus) {
+		this.showStatus = showStatus;
+	}
+}

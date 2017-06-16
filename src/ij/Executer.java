@@ -3,6 +3,7 @@ import ij.util.Tools;
 import ij.text.TextWindow;
 import ij.plugin.MacroInstaller;
 import ij.plugin.frame.Recorder;
+import ij.plugin.frame.Editor;
 import ij.io.OpenDialog;
 import java.io.*;
 import java.util.*;
@@ -47,7 +48,8 @@ public class Executer implements Runnable {
 	}
 
 	public void run() {
-		if (command==null) return;
+		if (command==null)
+			return;
 		if (listeners.size()>0) synchronized (listeners) {
 			for (int i=0; i<listeners.size(); i++) {
 				CommandListener listener = (CommandListener)listeners.elementAt(i);
@@ -99,6 +101,10 @@ public class Executer implements Runnable {
 						s = e + "\n \nThis plugin requires Java 1.7 or later.";
 						w=700; h=150;
 					}
+					if (s.indexOf("version 52.0")!=-1) {
+						s = e + "\n \nThis plugin requires Java 1.8 or later.";
+						w=700; h=150;
+					}
 				}
 				if (IJ.getInstance()!=null) {
 					s = IJ.getInstance().getInfo()+"\n \n"+s;
@@ -139,10 +145,61 @@ public class Executer implements Runnable {
 			// is it in the File>Open Recent menu?
 			if (openRecent(cmd))
 				return;
-			IJ.error("Unrecognized command: \"" + cmd+"\"");
+			// is it an example in Help>Examples menu?
+			if (openExample(cmd))
+				return;
+			if ("Auto Threshold".equals(cmd)&&(String)table.get("Auto Threshold...")!=null)
+				runCommand("Auto Threshold...");
+			else if ("Enhance Local Contrast (CLAHE)".equals(cmd)&&(String)table.get("CLAHE ")!=null)
+				runCommand("CLAHE ");
+			else
+				IJ.error("Unrecognized command: \"" + cmd+"\"");
 	 	}
     }
     
+	private boolean openExample(String name) {
+		boolean isMacro = name.endsWith(".ijm");
+		boolean isJava = name.endsWith(".java");
+		boolean isJavaScript = name.endsWith(".js");
+		boolean isBeanShell = name.endsWith(".bsh");
+		boolean isPython = name.endsWith(".py");
+		if (!(isMacro||isJava||isJavaScript||isBeanShell||isPython))
+			return false;
+		boolean run = !isJava && (Prefs.autoRunExamples||IJ.shiftKeyDown()||IJ.controlKeyDown()||IJ.altKeyDown());
+		int rows = 24;
+		int columns = 70;
+		int options = Editor.MENU_BAR;
+		String text = null;
+		Editor ed = new Editor(rows, columns, 0, options);
+		String dir = "Macro/";
+		if (isJava)
+			dir = "Java/";
+		else if (isJavaScript)
+			dir = "JavaScript/";
+		else if (isBeanShell)
+			dir = "BeanShell/";
+		else if (isPython)
+			dir = "Python/";
+		String url = "http://wsr.imagej.net/download/Examples/"+dir+name;
+		text = IJ.openUrlAsString(url);
+		if (text.startsWith("<Error: ")) {
+			IJ.error("Open Example", text);
+			return true;
+		}
+		ed.create(name, text);
+		if (run) {
+			if (isJavaScript)
+				ed.evaluateScript(".js");
+			else if (isBeanShell)
+				ed.evaluateScript(".bsh");
+			else if (isPython)
+				ed.evaluateScript(".py");
+			else if (!name.contains("_Tool"))
+				IJ.runMacro(text);
+		}
+		return true;
+	}
+
     /** Opens a .lut file from the ImageJ/luts directory and returns 'true' if successful. */
     public static boolean loadLut(String name) {
 		String path = IJ.getDirectory("luts")+name.replace(" ","_")+".lut";

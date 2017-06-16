@@ -39,6 +39,8 @@ public class SimpleCommands implements PlugIn {
 			resultsToImage();
 		else if (arg.equals("display"))
 			IJ.runMacroFile("ij.jar:ShowAllLuts", null);
+		else if (arg.equals("missing"))
+			showMissingPluginsMessage();
 		else if (arg.equals("fonts"))
 			showFonts();
 	}
@@ -90,9 +92,7 @@ public class SimpleCommands implements PlugIn {
 		GenericDialog gd = new GenericDialog("Rename");
 		gd.addStringField("Title:", imp.getTitle(), 30);
 		gd.showDialog();
-		if (gd.wasCanceled())
-			return;
-		else
+		if (!gd.wasCanceled())
 			imp.setTitle(gd.getNextString());
 	}
 		
@@ -174,5 +174,14 @@ public class SimpleCommands implements PlugIn {
 		if (ip==null) return;
 		new ImagePlus("Results Table", ip).show();
 	}
+	
+	private void showMissingPluginsMessage() {
+		IJ.showMessage("Path Randomization", 
+			"Plugins were not loaded due to macOS Path Randomization.\n"+
+			"To work around this problem, move ImageJ.app out of the\n"+
+			"ImageJ folder and then copy it back. More information is at\n \n"+
+			IJ.URL+"/docs/install/osx.html#randomization");
+	}
 
+		
 }

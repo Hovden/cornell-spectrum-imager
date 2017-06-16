@@ -1,25 +1,22 @@
 package ij.plugin;
-import java.awt.*;
-import java.io.*;
-import java.util.*;
 import ij.*;
 import ij.gui.*;
 import ij.io.*;
 import ij.plugin.frame.Editor;
 import ij.plugin.Macro_Runner;
-import ij.plugin.filter.*;
-import java.io.PrintWriter;
-import java.io.StringWriter;
-import java.io.Writer;
+import ij.plugin.filter.PlugInFilter;
+import ij.plugin.filter.PlugInFilterRunner;
+import java.awt.Font;
 import java.lang.reflect.Method;
-import java.util.List;
-import java.util.Locale;
+import java.io.*;
+import java.util.*;
+import javax.tools.*;
 
 /** Compiles and runs plugins using the javac compiler. */
 public class Compiler implements PlugIn, FilenameFilter {
 
-	private static final int TARGET14=0, TARGET15=1, TARGET16=2,  TARGET17=3,  TARGET18=4;
-	private static final String[] targets = {"1.4", "1.5", "1.6", "1.7", "1.8"};
+	private static final int TARGET14=0, TARGET15=1, TARGET16=2,  TARGET17=3,  TARGET18=4, TARGET19=5;
+	private static final String[] targets = {"1.4", "1.5", "1.6", "1.7", "1.8", "1.9"};
 	private static final String TARGET_KEY = "javac.target";
 	private static CompilerTool compilerTool;
 	private static String dir, name;
@@ -56,15 +53,12 @@ public class Compiler implements PlugIn, FilenameFilter {
 			return;
 		}
 		if (!isJavac()) {
-			//boolean pluginClassLoader = this.getClass().getClassLoader()==IJ.getClassLoader();
-			//boolean contextClassLoader = Thread.currentThread().getContextClassLoader()==IJ.getClassLoader();
-			if (IJ.debugMode) IJ.log("javac not found: ");
+			if (IJ.debugMode) IJ.log("Compiler: javac not found");
 			if (!checkForUpdateDone) {
 				checkForUpdate("/plugins/compiler/Compiler.jar", "1.48c");
 				checkForUpdateDone = true;
 			}
 			Object compiler = IJ.runPlugIn("Compiler", dir+name);
-			if (IJ.debugMode) IJ.log("plugin compiler: "+compiler);
 			if (compiler==null) {
 				boolean ok = Macro_Runner.downloadJar("/plugins/compiler/Compiler.jar");
 				if (ok)
@@ -131,7 +125,7 @@ public class Compiler implements PlugIn, FilenameFilter {
 		Vector sources = new Vector();
 		sources.add(path);
 		
-		if (IJ.debugMode){
+		if (IJ.debugMode) {
 			StringBuilder builder = new StringBuilder();
 			builder.append("javac");
 			for (int i=0; i< options.size(); i++){
@@ -184,16 +178,18 @@ public class Compiler implements PlugIn, FilenameFilter {
 		File f = new File(path);
 		if (f.exists() && f.isDirectory())
 			list = f.list();
-		if (list==null) return;
+		if (list==null)
+			return;
+		boolean isJarsFolder = path.endsWith("jars");
 		if (!path.endsWith(File.separator))
 			path += File.separator;
 		for (int i=0; i<list.length; i++) {
 			File f2 = new File(path+list[i]);
 			if (f2.isDirectory())
 				addJars(path+list[i], sb);
-			else if (list[i].endsWith(".jar")&&(list[i].indexOf("_")==-1||list[i].equals("loci_tools.jar")||list[i].contains("3D_Viewer"))) {
+			else if (list[i].endsWith(".jar")&&(!list[i].contains("_")||isJarsFolder||list[i].equals("loci_tools.jar"))) {
 				sb.append(File.pathSeparator+path+list[i]);
-				if (IJ.debugMode) IJ.log("javac classpath: "+path+list[i]);
+				//IJ.log("javac classpath: "+path+list[i]);
 			}
 		}
 	}
@@ -203,8 +199,12 @@ public class Compiler implements PlugIn, FilenameFilter {
 			errors = (Editor)IJ.runPlugIn("ij.plugin.frame.Editor", "");
 			errors.setFont(new Font("Monospaced", Font.PLAIN, 12));
 		}
-		if (errors!=null)
+		if (errors!=null) {
+			ImageJ ij = IJ.getInstance();
+			if (ij!=null)
+				s = ij.getInfo()+"\n \n"+s;
 			errors.display("Errors", s);
+		}
 		IJ.showStatus("done (errors)");
 	}
 
@@ -278,19 +278,22 @@ public class Compiler implements PlugIn, FilenameFilter {
 	}
 	
 	void validateTarget() {
-		if (target<0 || target>TARGET18)
-			target = TARGET16;
-		if (target>TARGET15 && !(IJ.isJava16()||IJ.isJava17()||IJ.isJava18()))
+		if (target>TARGET19)
+			target = TARGET19;
+		if (target<TARGET15)
 			target = TARGET15;
-		if (target>TARGET16 && !(IJ.isJava17()||IJ.isJava18()))
+		if (target>TARGET15 && !(IJ.isJava16()||IJ.isJava17()||IJ.isJava18()||IJ.isJava19()))
 			target = TARGET16;
-		if (target>TARGET17 && !IJ.isJava18())
+		if (target>TARGET16 && !(IJ.isJava17()||IJ.isJava18()||IJ.isJava19()))
+			target = TARGET16;
+		if (target>TARGET17 && !(IJ.isJava18()||IJ.isJava19()))
 			target = TARGET17;
+		if (target>TARGET18 && !IJ.isJava19())
+			target = TARGET18;
 		Prefs.set(TARGET_KEY, target);
 	}
 	
 }
-
 
 class PlugInExecuter implements Runnable {
 	private String plugin;
@@ -312,7 +315,7 @@ class PlugInExecuter implements Runnable {
 	}
 	
 	void runCompiledPlugin(String className) {
-		if (IJ.debugMode) IJ.log("runCompiledPlugin: "+className);
+		if (IJ.debugMode) IJ.log("Compiler: running "+className);
 		IJ.resetClassLoader();
 		ClassLoader loader = IJ.getClassLoader();
 		Object thePlugIn = null;
@@ -349,32 +352,19 @@ class PlugInExecuter implements Runnable {
 }
 
 abstract class CompilerTool {
+
 	public static class JavaxCompilerTool extends CompilerTool {
-		protected static Class charsetC;
-		protected static Class diagnosticListenerC;
-		protected static Class javaFileManagerC;
-		protected static Class toolProviderC;
 
 		public boolean compile(List sources, List options, StringWriter log) {
+			if (IJ.debugMode) IJ.log("Compiler: using javax.tool.JavaCompiler");
 			try {
-				Object javac = getJavac();
-
-				Class[] getStandardFileManagerTypes = new Class[] { diagnosticListenerC, Locale.class, charsetC };
-				Method getStandardFileManager = javac.getClass().getMethod("getStandardFileManager", getStandardFileManagerTypes);
-				Object fileManager = getStandardFileManager.invoke(javac, new Object[] { null, null, null });
-
-				Class[] getJavaFileObjectsFromStringsTypes = new Class[] { Iterable.class };
-				Method getJavaFileObjectsFromStrings = fileManager.getClass().getMethod("getJavaFileObjectsFromStrings", getJavaFileObjectsFromStringsTypes);
-				Object compilationUnits = getJavaFileObjectsFromStrings.invoke(fileManager, new Object[] { sources });
-
-				Class[] getTaskParamTypes = new Class[] { Writer.class, javaFileManagerC, diagnosticListenerC, Iterable.class, Iterable.class, Iterable.class };
-				Method getTask = javac.getClass().getMethod("getTask", getTaskParamTypes);
-				Object task = getTask.invoke(javac, new Object[] { log, fileManager, null, options, null, compilationUnits });
-
-				Method call = task.getClass().getMethod("call", new Class[0]);
-				Object result = call.invoke(task, new Object[0]);
-
-				return Boolean.TRUE.equals(result);
+				JavaCompiler javac = getJavac();
+				DiagnosticCollector<JavaFileObject> diagnostics = new DiagnosticCollector<JavaFileObject>();
+				StandardJavaFileManager fileManager = javac.getStandardFileManager(diagnostics, null, null);
+				Iterable<? extends JavaFileObject> compilationUnits = fileManager.getJavaFileObjectsFromStrings(sources);
+				JavaCompiler.CompilationTask task =javac.getTask(log, fileManager, null, options, null, compilationUnits);
+    			fileManager.close();
+    			return task.call();
 			} catch (Exception e) {
 				PrintWriter printer = new PrintWriter(log);
 				e.printStackTrace(printer);
@@ -383,33 +373,17 @@ abstract class CompilerTool {
 			return false;
 		}
 
-		protected Object getJavac() throws Exception {
-			if (charsetC==null)
-				charsetC = Class.forName("java.nio.charset.Charset");
-			if (diagnosticListenerC==null)
-				diagnosticListenerC = Class.forName("javax.tools.DiagnosticListener");
-			if (javaFileManagerC==null)
-				javaFileManagerC = Class.forName("javax.tools.JavaFileManager");
-			if (toolProviderC==null)
-				toolProviderC = Class.forName("javax.tools.ToolProvider");
-			Method get = toolProviderC.getMethod("getSystemJavaCompiler", new Class[0]);
-			return get.invoke(null, new Object[0]);
+		protected JavaCompiler getJavac() throws Exception {
+			JavaCompiler javac = ToolProvider.getSystemJavaCompiler();
+			return javac;
 		}
 	}
 
 	public static class LegacyCompilerTool extends CompilerTool {
 		protected static Class javacC;
 
-		boolean areErrors(String s) {
-			boolean errors = s != null && s.length() > 0;
-			if (errors && s.indexOf("1 warning") > 0 && s.indexOf("[deprecation] show()") > 0)
-				errors = false;
-			// if(errors&&s.startsWith("Note:com.sun.tools.javac")&&s.indexOf("error")==-1)
-			// errors = false;
-			return errors;
-		}
-
 		public boolean compile(List sources, List options, StringWriter log) {
+			if (IJ.debugMode) IJ.log("Compiler: using com.sun.tools.javac");
 			try {
 				final String[] args = new String[sources.size() + options.size()];
 				int argsIndex = 0;
@@ -417,13 +391,13 @@ abstract class CompilerTool {
 					args[argsIndex++] = (String) options.get(optionsIndex);
 				for (int sourcesIndex = 0; sourcesIndex < sources.size(); sourcesIndex++)
 					args[argsIndex++] = (String) sources.get(sourcesIndex);
+				PrintWriter printer = new PrintWriter(log);
 				Object javac = getJavac();
 				Class[] compileTypes = new Class[] { String[].class, PrintWriter.class };
 				Method compile = javacC.getMethod("compile", compileTypes);
-				PrintWriter printer = new PrintWriter(log);
 				Object result = compile.invoke(javac, new Object[] { args, printer });
 				printer.flush();
-				return Integer.valueOf(0).equals(result) | areErrors(log.toString());
+				return Integer.valueOf(0).equals(result);
 			} catch (Exception e) {
 				e.printStackTrace(new PrintWriter(log));
 			}
@@ -438,16 +412,14 @@ abstract class CompilerTool {
 	}
 
 	public static CompilerTool getDefault() {
-		CompilerTool javax = new JavaxCompilerTool();
-		if (javax.isSupported()) {
-			if (IJ.debugMode) IJ.log("javac: using javax.tool.JavaCompiler");
-			return javax;
+		if (IJ.isJava16()) {
+			CompilerTool javax = new JavaxCompilerTool();
+			if (javax.isSupported())
+				return javax;
 		}
 		CompilerTool legacy = new LegacyCompilerTool();
-		if (legacy.isSupported()) {
-			if (IJ.debugMode) IJ.log("javac: using com.sun.tools.javac");
+		if (legacy.isSupported())
 			return legacy;
-		}
 		return null;
 	}
 

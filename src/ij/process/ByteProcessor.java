@@ -80,6 +80,7 @@ public class ByteProcessor extends ImageProcessor {
 		pixels = ((DataBufferByte) buffer).getData();
 		width = raster.getWidth();
 		height = raster.getHeight();
+		resetRoi();
 	}
 
 	/** Creates a ByteProcessor from an ImageProcessor. 16-bit and 32-bit
@@ -184,9 +185,8 @@ public class ByteProcessor extends ImageProcessor {
 	
 	/** Reset the image from snapshot.*/
 	public void reset() {
-		if (snapshotPixels==null)
-			return;	
-        System.arraycopy(snapshotPixels,0,pixels,0,width*height);
+		if (snapshotPixels!=null)
+			System.arraycopy(snapshotPixels,0,pixels,0,width*height);
 	}
 	
 	/** Swaps the pixel and snapshot (undo) arrays. */
@@ -311,7 +311,6 @@ public class ByteProcessor extends ImageProcessor {
 
 	/** Sets the foreground drawing color. */
 	public void setColor(Color color) {
-		//if (ij.IJ.altKeyDown()) throw new IllegalArgumentException("setColor: "+color);
 		drawingColor = color;
 		fgColor = getBestIndex(color);
 	}
@@ -937,8 +936,6 @@ public class ByteProcessor extends ImageProcessor {
 		double yFraction = y - ybase;
 		int offset = ybase * width + xbase;
 		int lowerLeft = pixels[offset]&255;
-		//if ((xbase>=(width-1))||(ybase>=(height-1)))
-		//	return lowerLeft;
 		int lowerRight = pixels[offset + 1]&255;
 		int upperRight = pixels[offset + width + 1]&255;
 		int upperLeft = pixels[offset + width]&255;
@@ -962,8 +959,8 @@ public class ByteProcessor extends ImageProcessor {
 		double xScale = (double)dstWidth/roiWidth;
 		double yScale = (double)dstHeight/roiHeight;
 		if (interpolationMethod!=NONE) {
-			dstCenterX += xScale/2.0;
-			dstCenterY += yScale/2.0;
+			if (dstWidth!=width) dstCenterX+=xScale/4.0;
+			if (dstHeight!=height) dstCenterY+=yScale/4.0;
 		}
 		ImageProcessor ip2 = createProcessor(dstWidth, dstHeight);
 		byte[] pixels2 = (byte[])ip2.getPixels();

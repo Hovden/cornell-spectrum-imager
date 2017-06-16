@@ -79,8 +79,8 @@ public class ImageJ extends Frame implements ActionListener,
 	MouseListener, KeyListener, WindowListener, ItemListener, Runnable {
 
 	/** Plugins should call IJ.getVersion() or IJ.getFullVersion() to get the version string. */
-	public static final String VERSION = "1.49t";
-	public static final String BUILD = ""; 
+	public static final String VERSION = "1.51o";
+	public static final String BUILD = "";
 	public static Color backgroundColor = new Color(237,237,237);
 	/** SansSerif, 12-point, plain font. */
 	public static final Font SansSerif12 = new Font("SansSerif", Font.PLAIN, 12);
@@ -140,7 +140,7 @@ public class ImageJ extends Frame implements ActionListener,
 		If  'mode' is ImageJ.EMBEDDED and 'applet is null, creates an embedded 
 		(non-standalone) version of ImageJ. */
 	public ImageJ(java.applet.Applet applet, int mode) {
-		super("ImageJ with CSI"); //HOVDEN
+		super("ImageJ");
 		if ((mode&DEBUG)!=0)
 			IJ.setDebugMode(true);
 		mode = mode & 255;
@@ -169,7 +169,7 @@ public class ImageJ extends Frame implements ActionListener,
 		statusLine.addKeyListener(this);
 		statusLine.addMouseListener(this);
 		statusBar.add("Center", statusLine);
-		progressBar = new ProgressBar(120, 20);
+		progressBar = new ProgressBar(ProgressBar.WIDTH, ProgressBar.HEIGHT);
 		progressBar.addKeyListener(this);
 		progressBar.addMouseListener(this);
 		statusBar.add("East", progressBar);
@@ -188,9 +188,26 @@ public class ImageJ extends Frame implements ActionListener,
 		if (mode!=NO_SHOW) {
 			if (IJ.isWindows()) try {setIcon();} catch(Exception e) {}
 			setLocation(loc.x, loc.y);
-			setResizable(!IJ.isMacOSX());
+			setResizable(false);
+			setAlwaysOnTop(Prefs.alwaysOnTop);
 			pack();
 			setVisible(true);
+			Dimension size = getSize();
+			if (size!=null) {
+				if (IJ.debugMode) IJ.log("size: "+size);
+				if (IJ.isWindows() && size.height>108) {
+					// workaround for IJ window layout and FileDialog freeze problems with Windows 10 Creators Update
+					IJ.wait(10);
+					pack();
+					if (IJ.debugMode) IJ.log("pack()");
+					if (!Prefs.jFileChooserSettingChanged)
+						Prefs.useJFileChooser = true;
+				} else if (IJ.isMacOSX()) {
+					Rectangle maxBounds = GUI.getMaxWindowBounds();
+					if (loc.x+size.width>maxBounds.x+maxBounds.width)
+						setLocation(loc.x, loc.y);
+				}
+			}
 		}
 		if (err1!=null)
 			IJ.error(err1);
@@ -257,7 +274,7 @@ public class ImageJ extends Frame implements ActionListener,
 	}
 	
     void setIcon() throws Exception {
-		URL url = this.getClass().getResource("/images/CSI_prism.gif");
+		URL url = this.getClass().getResource("/microscope.gif");
 		if (url==null) return;
 		Image img = createImage((ImageProducer)url.getContent());
 		if (img!=null) setIconImage(img);
@@ -267,6 +284,7 @@ public class ImageJ extends Frame implements ActionListener,
 		Rectangle maxBounds = GUI.getMaxWindowBounds();
 		int ijX = Prefs.getInt(IJ_X,-99);
 		int ijY = Prefs.getInt(IJ_Y,-99);
+		//System.out.println("getPreferredLoc1: "+ijX+" "+ijY+" "+maxBounds);
 		if (ijX>=maxBounds.x && ijY>=maxBounds.y && ijX<(maxBounds.x+maxBounds.width-75))
 			return new Point(ijX, ijY);
 		Dimension tbsize = toolbar.getPreferredSize();
@@ -319,6 +337,11 @@ public class ImageJ extends Frame implements ActionListener,
 		if ((e.getSource() instanceof MenuItem)) {
 			MenuItem item = (MenuItem)e.getSource();
 			String cmd = e.getActionCommand();
+			Frame frame = WindowManager.getFrontWindow();
+			if (frame!=null && (frame instanceof Fitter)) {
+				((Fitter)frame).actionPerformed(e);
+				return;
+			}
 			commandName = cmd;
 			ImagePlus imp = null;
 			if (item.getParent()==Menus.getOpenRecentMenu()) {
@@ -350,7 +373,9 @@ public class ImageJ extends Frame implements ActionListener,
 		MenuItem item = (MenuItem)e.getSource();
 		MenuComponent parent = (MenuComponent)item.getParent();
 		String cmd = e.getItem().toString();
-		if ((Menu)parent==Menus.window)
+		if ("Autorun".equals(cmd)) // Examples>Autorun
+			Prefs.autoRunExamples = e.getStateChange()==1;
+		else if ((Menu)parent==Menus.window)
 			WindowManager.activateWindow(cmd, item);
 		else
 			doCommand(cmd);
@@ -379,7 +404,6 @@ public class ImageJ extends Frame implements ActionListener,
 	public void mouseEntered(MouseEvent e) {}
 
  	public void keyPressed(KeyEvent e) {
- 		//if (e.isConsumed()) return;
 		int keyCode = e.getKeyCode();
 		IJ.setKeyDown(keyCode);
 		hotkey = false;
@@ -456,6 +480,8 @@ public class ImageJ extends Frame implements ActionListener,
 				case KeyEvent.VK_BACK_SPACE: // delete
 					if (deleteOverlayRoi(imp))
 						return;
+					if (imp!=null&&imp.getOverlay()!=null&&imp==GelAnalyzer.getGelImage())
+						return;
 					cmd="Clear";
 					hotkey=true;
 					break; 
@@ -470,6 +496,12 @@ public class ImageJ extends Frame implements ActionListener,
 					Roi roi = imp.getRoi();
 					if (IJ.shiftKeyDown()&&imp==Orthogonal_Views.getImage())
 						return;
+					if (IJ.isMacOSX() && IJ.isJava18()) {
+						RoiManager rm = RoiManager.getInstance();
+						boolean rmActive = rm!=null && rm==WindowManager.getActiveWindow();
+						if (rmActive && (keyCode==KeyEvent.VK_DOWN||keyCode==KeyEvent.VK_UP))
+						  rm.repaint();
+					}
 					boolean stackKey = imp.getStackSize()>1 && (roi==null||IJ.shiftKeyDown());
 					boolean zoomKey = roi==null || IJ.shiftKeyDown() || IJ.controlKeyDown();
 					if (stackKey && keyCode==KeyEvent.VK_RIGHT)
@@ -481,7 +513,7 @@ public class ImageJ extends Frame implements ActionListener,
 					else if (zoomKey && keyCode==KeyEvent.VK_UP && !ignoreArrowKeys(imp) && Toolbar.getToolId()<Toolbar.SPARE6)
 							cmd="In [+]";
 					else if (roi!=null) {
-						if ((flags & KeyEvent.ALT_MASK) != 0)
+						if ((flags & KeyEvent.ALT_MASK)!=0 || (flags & KeyEvent.CTRL_MASK)!=0)
 							roi.nudgeCorner(keyCode);
 						else
 							roi.nudge(keyCode);
@@ -538,7 +570,7 @@ public class ImageJ extends Frame implements ActionListener,
 	
 	private boolean ignoreArrowKeys(ImagePlus imp) {
 		Frame frame = WindowManager.getFrontWindow();
-		String title = frame.getTitle();
+		String title = frame!=null?frame.getTitle():null;
 		if (title!=null && title.equals("ROI Manager"))
 			return true;
 		// Control Panel?
@@ -593,7 +625,12 @@ public class ImageJ extends Frame implements ActionListener,
 	public void windowActivated(WindowEvent e) {
 		if (IJ.isMacintosh() && !quitting) {
 			IJ.wait(10); // may be needed for Java 1.4 on OS X
-			setMenuBar(Menus.getMenuBar());
+			MenuBar mb = Menus.getMenuBar();
+			if (mb!=null && mb!=getMenuBar()) {
+				setMenuBar(mb);
+				Menus.setMenuBarCount++;
+				if (IJ.debugMode) IJ.log("setMenuBar: "+Menus.setMenuBarCount);
+			}
 		}
 	}
 	
@@ -632,10 +669,12 @@ public class ImageJ extends Frame implements ActionListener,
 	/** Called once when ImageJ quits. */
 	public void savePreferences(Properties prefs) {
 		Point loc = getLocation();
+		if (IJ.isLinux()) {
+			Rectangle bounds = GUI.getMaxWindowBounds();
+			loc.y = bounds.y;
+		}
 		prefs.put(IJ_X, Integer.toString(loc.x));
 		prefs.put(IJ_Y, Integer.toString(loc.y));
-		//prefs.put(IJ_WIDTH, Integer.toString(size.width));
-		//prefs.put(IJ_HEIGHT, Integer.toString(size.height));
 	}
 
 	public static void main(String args[]) {
@@ -674,7 +713,8 @@ public class ImageJ extends Frame implements ActionListener,
 		}
   		// If existing ImageJ instance, pass arguments to it and quit.
   		boolean passArgs = mode==STANDALONE && !noGUI;
-		if (IJ.isMacOSX() && !commandLine) passArgs = false;
+		if (IJ.isMacOSX() && !commandLine)
+			passArgs = false;
 		if (passArgs && isRunning(args)) 
   			return;
  		ImageJ ij = IJ.getInstance();    	

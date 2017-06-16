@@ -8,6 +8,7 @@ import java.awt.geom.*;
 /** This plugin implements the Edit/Selection/Rotate command. */
 public class RoiRotator implements PlugIn {
 	private static double defaultAngle = 15;
+	private static boolean rotateAroundImageCenter;
 
 	public void run(String arg) {
 		ImagePlus imp = IJ.getImage();
@@ -21,14 +22,18 @@ public class RoiRotator implements PlugIn {
 			return;
 		if (!IJ.macroRunning())
 			defaultAngle = angle;
-		if (roi instanceof ImageRoi) {
-			((ImageRoi)roi).rotate(angle);
-			imp.draw();
-			return;
+		FloatPolygon center = roi.getRotationCenter();
+		double xcenter = center.xpoints[0];
+		double ycenter = center.ypoints[0];
+		if (rotateAroundImageCenter) {
+			xcenter = imp.getWidth()/2.0;
+			ycenter = imp.getHeight()/2.0;
 		}
-		Roi roi2 = rotate(roi, angle);
-		if (roi2==null)
+		Roi roi2 = rotate(roi, angle, xcenter, ycenter);
+		if (roi2==null && (roi instanceof ImageRoi))
 			return;
+		if (!rotateAroundImageCenter)
+			roi2.setRotationCenter(xcenter,ycenter);
 		Undo.setup(Undo.ROI, imp);
 		roi = (Roi)roi.clone();
 		imp.setRoi(roi2);
@@ -40,21 +45,34 @@ public class RoiRotator implements PlugIn {
 		int decimalPlaces = 0;
 		if ((int)angle!=angle)
 			decimalPlaces = 2;
+		if (Macro.getOptions()!=null)
+			rotateAroundImageCenter = false;
 		gd.addNumericField("Angle:", angle, decimalPlaces, 3, "degrees");
+		gd.addCheckbox("Rotate around image center", rotateAroundImageCenter);
 		gd.setInsets(5, 0, 0);
 		gd.addMessage("Enter negative angle to \nrotate counter-clockwise", null, Color.darkGray);
 		gd.showDialog();
 		if (gd.wasCanceled())
 			return Double.NaN;
-		else
-			return gd.getNextNumber();
+		rotateAroundImageCenter = gd.getNextBoolean();
+		return gd.getNextNumber();
 	}
 	
 	public static Roi rotate(Roi roi, double angle) {
+		if (roi instanceof ImageRoi) {
+			((ImageRoi)roi).rotate(angle);
+			return roi;
+		}
+		FloatPolygon center = roi.getRotationCenter();
+		double xcenter = center.xpoints[0];
+		double ycenter = center.ypoints[0];
+		Roi roi2 = rotate(roi, angle, xcenter, ycenter);
+		roi2.setRotationCenter(xcenter,ycenter);
+		return roi2;
+	}
+
+	public static Roi rotate(Roi roi, double angle, double xcenter, double ycenter) {
 		double theta = -angle*Math.PI/180.0;
-		Rectangle r = roi.getBounds();
-		double xcenter = r.x+r.width/2.0;
-		double ycenter = r.y+r.height/2.0;
 		if (roi instanceof ShapeRoi)
 			return rotateShape((ShapeRoi)roi, -theta, xcenter, ycenter);
 		FloatPolygon poly = roi.getFloatPolygon();
@@ -68,8 +86,6 @@ public class RoiRotator implements PlugIn {
 			poly = new FloatPolygon();
 			poly.addPoint(x1, y1);
 			poly.addPoint(x2, y2);
-			xcenter = x1 + (x2-x1)/2.0;
-			ycenter = y1 + (y2-y1)/2.0;
 		}
 		for (int i=0; i<poly.npoints; i++) {
 			double dx = poly.xpoints[i]-xcenter;

@@ -35,6 +35,7 @@ import java.util.Properties;
  *	@author Johannes Schindelin
  */
 public class OtherInstance {
+	private static final String DELIMETER = "~!~"; // Separates macro name and argument
 
 	interface ImageJInstance extends Remote {
 		void sendArgument(String arg) throws RemoteException;
@@ -51,12 +52,10 @@ public class OtherInstance {
 				String name = cmd.substring(6);
 				String name2 = name;
 				String arg = null;
-				if (name2.endsWith(")")) {
-					int index = name2.lastIndexOf("(");
-					if (index>0) {
-						name = name2.substring(0, index);
-						arg = name2.substring(index+1, name2.length()-1);
-					}
+				int index = name2.indexOf(DELIMETER);
+				if (index!=-1) {
+					name = name2.substring(0, index);
+					arg = name2.substring(index+DELIMETER.length(), name2.length());
 				}
 				IJ.runMacroFile(name, arg);
 			} else if (cmd.startsWith("run "))
@@ -125,25 +124,24 @@ public class OtherInstance {
 		if (!isRMIEnabled())
 			return false;
 		String file = getStubPath();
-		if (args.length>0) try {
+		try {
 			FileInputStream in = new FileInputStream(file);
 			ImageJInstance instance = (ImageJInstance) new ObjectInputStream(in).readObject();
 			in.close();
 			if (instance==null)
 				return false;
-
-			//IJ.log("sendArguments3: "+instance);
 			instance.sendArgument("user.dir "+System.getProperty("user.dir"));
 			int macros = 0;
 			for (int i=0; i<args.length; i++) {
 				String arg = args[i];
-				if (arg==null) continue;
+				if (arg==null)
+					continue;
 				String cmd = null;
 				if (macros==0 && arg.endsWith(".ijm")) {
 					cmd = "macro " + arg;
 					macros++;
 				} else if (arg.startsWith("-macro") && i+1<args.length) {
-					String macroArg = i+2<args.length?"("+args[i+2]+")":"";
+					String macroArg = i+2<args.length?DELIMETER+args[i+2]:"";
 					cmd = "macro " + args[i+1] + macroArg;
 					instance.sendArgument(cmd);
 					break;
@@ -158,8 +156,6 @@ public class OtherInstance {
 				if (cmd!=null)
 					instance.sendArgument(cmd);
 			} // for
-
-			//IJ.log("sendArguments: return true");
 			return true;
 		} catch (Exception e) {
 			if (IJ.debugMode) {
@@ -241,13 +237,7 @@ public class OtherInstance {
 		String env = System.getenv("IJ_PREFS_DIR");
 		if (env != null)
 			return env;
-		if (IJ.isWindows())
-			return System.getProperty("user.dir");
-		String prefsDir = System.getProperty("user.home");
-		if (IJ.isMacOSX())
-			prefsDir += "/Library/Preferences";
 		else
-			prefsDir += "/.imagej";
-		return prefsDir;
+			return Prefs.getPrefsDir();
 	}
 }

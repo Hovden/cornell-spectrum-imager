@@ -8,6 +8,7 @@ import ij.process.*;
 import ij.io.*;
 import ij.measure.*;
 import ij.plugin.frame.*;
+import ij.plugin.PointToolOptions;
 import ij.macro.Interpreter;
 import ij.util.*;
 
@@ -44,6 +45,7 @@ public class ImageWindow extends Frame implements FocusListener, WindowListener,
 	private static int count;
 	private static boolean centerOnScreen;
 	private static Point nextLocation;
+	public static long setMenuBarTime;
 	
     private int textGap = centerOnScreen?0:TEXT_GAP;
 	
@@ -142,6 +144,8 @@ public class ImageWindow extends Frame implements FocusListener, WindowListener,
      }
     
 	private void setLocationAndSize(boolean updating) {
+		if (imp==null)
+			return;
 		int width = imp.getWidth();
 		int height = imp.getHeight();
 		Rectangle maxWindow = getMaxWindow(0, 0);
@@ -181,7 +185,6 @@ public class ImageWindow extends Frame implements FocusListener, WindowListener,
 		int screenHeight = maxWindow.y+maxWindow.height-sliderHeight;
 		double mag = 1;
 		while (xbase+width*mag>maxWindow.x+maxWindow.width || ybase+height*mag>=screenHeight) {
-			//IJ.log(mag+"  "+xbase+"  "+width*mag+"  "+maxWindow.width);
 			double mag2 = ImageCanvas.getLowerZoomLevel(mag);
 			if (mag2==mag) break;
 			mag = mag2;
@@ -194,14 +197,15 @@ public class ImageWindow extends Frame implements FocusListener, WindowListener,
 		ic.setMagnification(mag);
 		if (y+height*mag>screenHeight)
 			y = ybase;
-        if (!updating) setLocation(x, y);
-		if (Prefs.open100Percent && ic.getMagnification()<1.0) {
+        if (Prefs.open100Percent && ic.getMagnification()<1.0) {
 			while(ic.getMagnification()<1.0)
 				ic.zoomIn(0, 0);
 			setSize(Math.min(width, maxWindow.width-x), Math.min(height, screenHeight-y));
 			validate();
 		} else 
 			pack();
+		if (!updating)
+			setLocation(x, y);
 	}
 					
 	Rectangle getMaxWindow(int xloc, int yloc) {
@@ -244,6 +248,8 @@ public class ImageWindow extends Frame implements FocusListener, WindowListener,
 	/** Override Container getInsets() to make room for some text above the image. */
 	public Insets getInsets() {
 		Insets insets = super.getInsets();
+		if (imp==null)
+			return insets;
 		double mag = ic.getMagnification();
 		int extraWidth = (int)((MIN_WIDTH - imp.getWidth()*mag)/2.0);
 		if (extraWidth<0) extraWidth = 0;
@@ -255,6 +261,8 @@ public class ImageWindow extends Frame implements FocusListener, WindowListener,
 
     /** Draws the subtitle. */
     public void drawInfo(Graphics g) {
+    	if (imp==null)
+    		return;
         if (textGap!=0) {
 			Insets insets = super.getInsets();
 			if (imp.isComposite()) {
@@ -274,6 +282,8 @@ public class ImageWindow extends Frame implements FocusListener, WindowListener,
     /** Creates the subtitle. */
     public String createSubtitle() {
     	String s="";
+    	if (imp==null)
+    		return s;
     	int nSlices = imp.getStackSize();
     	if (nSlices>1) {
     		ImageStack stack = imp.getStack();
@@ -370,7 +380,6 @@ public class ImageWindow extends Frame implements FocusListener, WindowListener,
     }
 
     public void paint(Graphics g) {
-		//if (IJ.debugMode) IJ.log("wPaint: " + imp.getTitle());
 		drawInfo(g);
 		Rectangle r = ic.getBounds();
 		int extraWidth = MIN_WIDTH - r.width;
@@ -466,10 +475,12 @@ public class ImageWindow extends Frame implements FocusListener, WindowListener,
 	}
 	
 	public Rectangle getMaximumBounds() {
+		Rectangle maxWindow = GUI.getMaxWindowBounds();
+		if (imp==null)
+			return maxWindow;
 		double width = imp.getWidth();
 		double height = imp.getHeight();
 		double iAspectRatio = width/height;
-		Rectangle maxWindow = GUI.getMaxWindowBounds();
 		maxWindowBounds = maxWindow;
 		if (iAspectRatio/((double)maxWindow.width/maxWindow.height)>0.75) {
 			maxWindow.y += 22;  // uncover ImageJ menu bar
@@ -501,7 +512,6 @@ public class ImageWindow extends Frame implements FocusListener, WindowListener,
 		int extraHeight = insets.top+insets.bottom + 10;
 		if (extraHeight==20) extraHeight = 42;
 		int members = getComponentCount();
-		//if (IJ.debugMode) IJ.log("getExtraSize: "+members+" "+insets);
 		for (int i=1; i<members; i++) {
 		    Component m = getComponent(i);
 		    Dimension d = m.getPreferredSize();
@@ -520,17 +530,11 @@ public class ImageWindow extends Frame implements FocusListener, WindowListener,
 	}
 	
 	public void maximize() {
-		if (maxBounds==null)
-			return;
-		int width = imp.getWidth();
-		int height = imp.getHeight();
-		Dimension extraSize = getExtraSize();
-		int extraHeight = extraSize.height;
-		double mag = (double)(maxBounds.height-extraHeight)/height;
-		if (IJ.debugMode) IJ.log("maximize: "+mag+" "+ic.getMagnification()+" "+maxBounds);
-		ic.setSize((int)(width*mag), (int)(height*mag));
-		ic.setSourceRect(new Rectangle(0, 0, width, height));
-		pack();
+		if (GenericDialog.getInstance()!=null)
+			return; // workaround for OSX/Java 8 maximize bug 
+		Rectangle rect = getMaximumBounds();
+		if (IJ.debugMode) IJ.log("maximize: "+rect);
+		setLocationAndSize(rect.x, rect.y, rect.width, rect.height);
 	}
 	
 	public void minimize() {
@@ -554,29 +558,28 @@ public class ImageWindow extends Frame implements FocusListener, WindowListener,
 
 	public void windowActivated(WindowEvent e) {
 		if (IJ.debugMode) IJ.log("windowActivated: "+imp.getTitle());
+		if (IJ.isMacOSX())
+			setImageJMenuBar(this);
+		if (imp==null)
+			return;
 		ImageJ ij = IJ.getInstance();
-		boolean quitting = ij!=null && ij.quitting();
-		if (IJ.isMacintosh() && ij!=null && !quitting) {
-			IJ.wait(10); // may be needed for Java 1.4 on OS X
-			setMenuBar(Menus.getMenuBar());
-		}
-		if (imp==null) return;
-		if (!closed && !quitting && !Interpreter.isBatchMode())
+		if (ij!=null && !closed && !ij.quitting() && !Interpreter.isBatchMode())
 			WindowManager.setCurrentWindow(this);
+		Roi roi = imp.getRoi();
+		if (roi!=null && (roi instanceof PointRoi))
+			PointToolOptions.update();
 		if (imp.isComposite())
 			Channels.updateChannels();
 		imp.setActivated(); // notify ImagePlus that image has been activated
 	}
 	
 	public void windowClosing(WindowEvent e) {
-		//IJ.log("windowClosing: "+imp.getTitle()+" "+closed);
 		if (closed)
 			return;
 		if (ij!=null) {
 			WindowManager.setCurrentWindow(this);
 			IJ.doCommand("Close");
 		} else {
-			//setVisible(false);
 			dispose();
 			WindowManager.removeWindow(this);
 		}
@@ -691,7 +694,30 @@ public class ImageWindow extends Frame implements FocusListener, WindowListener,
 	public int getSliderHeight() {
 		return sliderHeight;
 	}
-
+	
+	public static void setImageJMenuBar(ImageWindow win) {
+		ImageJ ij = IJ.getInstance();
+		boolean setMenuBar = true;
+		ImagePlus imp = win.getImagePlus();
+		if (imp!=null)
+			setMenuBar = imp.setIJMenuBar();
+		MenuBar mb = Menus.getMenuBar();
+		if (mb!=null && mb==win.getMenuBar())
+			setMenuBar = false;
+		setMenuBarTime = 0L;
+		if (setMenuBar && ij!=null && !ij.quitting() && !Interpreter.nonBatchMacroRunning()) {
+			IJ.wait(10); // may be needed for Java 1.4 on OS X
+			long t0 = System.currentTimeMillis();
+			win.setMenuBar(mb);
+			long time = System.currentTimeMillis()-t0;
+			setMenuBarTime = time;
+			Menus.setMenuBarCount++;
+			if (IJ.debugMode) IJ.log("setMenuBar: "+time+"ms ("+Menus.setMenuBarCount+")");
+			if (time>2000L)
+				Prefs.setIJMenuBar = false;
+		}
+		if (imp!=null) imp.setIJMenuBar(true);
+	}
 			
 } //class ImageWindow
 

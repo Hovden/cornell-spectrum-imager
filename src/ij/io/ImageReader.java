@@ -262,7 +262,6 @@ public class ImageReader {
 		int base = 0;
 		float last = 0;
 		for (int k=0; k<fi.stripOffsets.length; k++) {
-			//IJ.log("seek: "+fi.stripOffsets[k]+" "+(in instanceof RandomAccessStream));
 			if (in instanceof RandomAccessStream)
 				((RandomAccessStream)in).seek(fi.stripOffsets[k]);
 			else if (k > 0) {
@@ -364,7 +363,7 @@ public class ImageReader {
 	int[] readChunkyRGB(InputStream in) throws IOException {
 		if (fi.compression==FileInfo.JPEG)
 			return readJPEG(in);
-		else if (fi.compression>FileInfo.COMPRESSION_NONE)
+		else if (fi.compression>FileInfo.COMPRESSION_NONE || (fi.stripOffsets!=null&&fi.stripOffsets.length>1))
 			return readCompressedChunkyRGB(in);
 		int pixelsRead;
 		bufferSize = 24*width;
@@ -577,6 +576,7 @@ public class ImageReader {
 		if (fi.compression>FileInfo.COMPRESSION_NONE)
 			return readCompressedRGB48(in);
 		int channels = fi.samplesPerPixel;
+		if (channels==1) channels=3;
 		short[][] stack = new short[channels][nPixels];
 		DataInputStream dis = new DataInputStream(in);
 		int pixel = 0;
@@ -662,6 +662,7 @@ public class ImageReader {
 
 	Object readRGB48Planar(InputStream in) throws IOException {
 		int channels = fi.samplesPerPixel;
+		if (channels==1) channels=3;
 		Object[] stack = new Object[channels];
 		for (int i=0; i<channels; i++) 
 			stack[i] = read16bitImage(in);
@@ -875,7 +876,7 @@ public class ImageReader {
 		return readPixels(is);
 	}
 	
-	byte[] uncompress(byte[] input) {
+	private byte[] uncompress(byte[] input) {
 		if (fi.compression==FileInfo.PACK_BITS)
 			return packBitsUncompress(input, fi.rowsPerStrip*fi.width*fi.getBytesPerPixel());
 		else if (fi.compression==FileInfo.LZW || fi.compression==FileInfo.LZW_WITH_DIFFERENCING)

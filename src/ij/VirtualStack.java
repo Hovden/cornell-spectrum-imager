@@ -4,8 +4,9 @@ import ij.io.*;
 import ij.gui.ImageCanvas;
 import ij.util.Tools;
 import java.io.*;
-import java.awt.Font;
+import java.awt.*;
 import java.awt.image.ColorModel;
+import java.util.Properties;
 
 /** This class represents an array of disk-resident images. */
 public class VirtualStack extends ImageStack {
@@ -15,17 +16,33 @@ public class VirtualStack extends ImageStack {
 	private String[] names;
 	private String[] labels;
 	private int bitDepth;
+	private Properties  properties;
+
 	
 	/** Default constructor. */
 	public VirtualStack() { }
 
-	/** Creates a new, empty virtual stack. */
+	/** Creates an empty virtual stack. */
 	public VirtualStack(int width, int height, ColorModel cm, String path) {
 		super(width, height, cm);
 		this.path = path;
 		names = new String[INITIAL_SIZE];
 		labels = new String[INITIAL_SIZE];
 		//IJ.log("VirtualStack: "+path);
+	}
+
+	/** Creates a virtual stack with no backing storage.
+	This example creates a one million slice virtual
+	stack that uses just 1MB of RAM:
+	<pre>
+    stack = new VirtualStack(1024,1024,1000000);
+    new ImagePlus("No Backing Store Virtual Stack",stack).show();
+	</pre>
+	*/
+	public VirtualStack(int width, int height, int slices) {
+		super(width, height, null);
+		nSlices = slices;
+		bitDepth = 8;
 	}
 
 	 /** Adds an image to the end of the stack. */
@@ -93,7 +110,11 @@ public class VirtualStack extends ImageStack {
 		were 1<=n<=nslices. Returns null if the stack is empty.
 	*/
 	public ImageProcessor getProcessor(int n) {
-		//IJ.log("getProcessor: "+n+"  "+names[n-1]+"  "+bitDepth);
+		if (path==null) {
+			ImageProcessor ip = new ByteProcessor(getWidth(), getHeight());
+			label(ip, ""+n, Color.white);
+			return ip;
+		}
 		Opener opener = new Opener();
 		opener.setSilentMode(true);
 		IJ.redirectErrorMessages(true);
@@ -112,18 +133,13 @@ public class VirtualStack extends ImageStack {
 			depthThisImage = imp.getBitDepth();
 			ip = imp.getProcessor();
 			ip.setOverlay(imp.getOverlay());
+			properties = imp.getProperty("FHT")!=null?imp.getProperties():null;
 		} else {
 			File f = new File(path, names[n-1]);
 			String msg = f.exists()?"Error opening ":"File not found: ";
 			ip = new ByteProcessor(getWidth(), getHeight());
 			ip.invert();
-			int size = getHeight()/20;
-			if (size<9) size=9;
-			Font font = new Font("Helvetica", Font.PLAIN, size);
-			ip.setFont(font);
-			ip.setAntialiasedText(true);
-			ip.setColor(0);
-			ip.drawString(msg+names[n-1], size, size*2);
+			label(ip, msg+names[n-1], Color.black);
 			depthThisImage = 8;
 		}
 		if (depthThisImage!=bitDepth) {
@@ -141,6 +157,16 @@ public class VirtualStack extends ImageStack {
 		}
 		return ip;
 	 }
+	 
+	 private void label(ImageProcessor ip, String msg, Color color) {
+		int size = getHeight()/20;
+		if (size<9) size=9;
+		Font font = new Font("Helvetica", Font.PLAIN, size);
+		ip.setFont(font);
+		ip.setAntialiasedText(true);
+		ip.setColor(color);
+		ip.drawString(msg, size, size*2);
+	}
  
 	/** Currently not implemented */
 	public int saveChanges(int n) {
@@ -154,6 +180,8 @@ public class VirtualStack extends ImageStack {
 
 	/** Returns the label of the Nth image. */
 	public String getSliceLabel(int n) {
+		if (labels==null)
+			return null;
 		String label = labels[n-1];
 		if (label==null)
 			return names[n-1];
@@ -214,6 +242,12 @@ public class VirtualStack extends ImageStack {
 		}
 		return this;
 	}
+	
+	/** Returns the ImagePlus Properties assoctated with the current slice, or null. */
+	public Properties getProperties() {
+		return properties;
+	}
+
 
 } 
 
