@@ -1,4 +1,4 @@
-package plugins.CSI4D;
+package plugins.CSI;
 
 import ij.*;
 import ij.plugin.filter.*;
