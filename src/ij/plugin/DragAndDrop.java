@@ -2,6 +2,7 @@ package ij.plugin;
 import ij.*;
 import ij.gui.*;
 import ij.io.*;
+import ij.process.ImageProcessor;
 import java.io.*;
 import java.awt.Point;
 import java.awt.datatransfer.*;
@@ -146,6 +147,12 @@ public class DragAndDrop implements PlugIn, DropTargetListener, Runnable {
 			Iterator iterator = this.iterator;
 			while(iterator.hasNext()) {
 				Object obj = iterator.next();
+				String str = ""+obj;
+				if (str!=null && str.startsWith("https:/")) {
+					if (!str.startsWith("https://"))
+						str = str.replace("https:/", "http://");
+					obj = str;
+				}
 				if (obj!=null && (obj instanceof String))
 					openURL((String)obj);
 				else
@@ -167,12 +174,21 @@ public class DragAndDrop implements PlugIn, DropTargetListener, Runnable {
 				if (null == f) return;
 				String path = f.getCanonicalPath();
 				if (f.exists()) {
-					if (f.isDirectory())
-						openDirectory(f, path);
-					else {
+					if (f.isDirectory()) {
+						if (openAsVirtualStack)
+							IJ.run("Image Sequence...", "open=[" + path + "] sort use");
+						else
+							openDirectory(f, path);
+					} else {
 						if (openAsVirtualStack && (path.endsWith(".tif")||path.endsWith(".TIF")))
 							(new FileInfoVirtualStack()).run(path);
-						else
+						else if (openAsVirtualStack && (path.endsWith(".avi")||path.endsWith(".AVI")))
+							IJ.run("AVI...", "open=["+path+"] use");
+						else if (openAsVirtualStack && (path.endsWith(".txt"))) {
+							ImageProcessor ip = (new TextReader()).open(path);
+							if (ip!=null)
+								new ImagePlus(f.getName(),ip).show();
+						} else
 							(new Opener()).openAndAddToRecent(path);
 						OpenDialog.setLastDirectory(f.getParent()+File.separator);
 						OpenDialog.setLastName(f.getName());
@@ -204,7 +220,8 @@ public class DragAndDrop implements PlugIn, DropTargetListener, Runnable {
 			gd.addCheckbox("Use Virtual Stack", virtualStack);
 			gd.enableYesNoCancel();
 			gd.showDialog();
-			if (gd.wasCanceled()) return;
+			if (gd.wasCanceled())
+				return;
 			if (gd.wasOKed()) {
 				convertToRGB = gd.getNextBoolean();
 				virtualStack = gd.getNextBoolean();
@@ -217,7 +234,11 @@ public class DragAndDrop implements PlugIn, DropTargetListener, Runnable {
 				for (int k=0; k<names.length; k++) {
 					if (!names[k].startsWith(".")) {
 						IJ.redirectErrorMessages(true);
-						(new Opener()).open(path + names[k]);
+						ImagePlus imp = IJ.openImage(path+names[k]);
+						if (imp!=null) {
+							imp.setIJMenuBar(k==names.length-1);
+							imp.show();
+						}
 						IJ.redirectErrorMessages(false);
 					}
 				}

@@ -88,15 +88,7 @@ import java.io.*;
 				else
 					IJ.run(imp, "8-bit", "");
 			}
-			String path2 = outputPath+list[i];
-			if (format.equals("TIFF"))
-				(new FileSaver(imp)).saveAsTiff(path2);
-			else if (format.equals("JPEG"))
-				(new FileSaver(imp)).saveAsJpeg(path2);
-			else if (format.equals("PNG"))
-				(new FileSaver(imp)).saveAsPng(path2);
-			else
-				IJ.saveAs(imp, format, path2);
+			IJ.saveAs(imp, format, outputPath+list[i]);
 			imp.close();
 			imp = null;
 		}
@@ -110,7 +102,7 @@ import java.io.*;
 		gd = new GenericDialog("Batch Convert");
 		addPanels(gd);
 		gd.setInsets(15, 0, 5);
-		gd.addChoice("Output format:", formats, format);
+		gd.addChoice("Output_format:", formats, format);
 		gd.addChoice("Interpolation:", methods, methods[interpolationMethod]);
 		//gd.addStringField("Height (pixels): ", height==0?"\u2014":""+height, 6);
 		gd.addNumericField("Scale factor:", scale, 2);

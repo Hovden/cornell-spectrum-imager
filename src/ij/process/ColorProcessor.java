@@ -18,6 +18,7 @@ public class ColorProcessor extends ImageProcessor {
 	private int min=0, max=255;
 	private WritableRaster rgbRaster;
 	private SampleModel rgbSampleModel;
+	private boolean caSnapshot;
 	
 	// Weighting factors used by getPixelValue(), getHistogram() and convertToByte().
 	// Enable "Weighted RGB Conversion" in <i>Edit/Options/Conversions</i>
@@ -196,13 +197,13 @@ public class ColorProcessor extends ImageProcessor {
 		if (snapshotPixels==null || (snapshotPixels!=null && snapshotPixels.length!=pixels.length))
 			snapshotPixels = new int[width * height];
 		System.arraycopy(pixels, 0, snapshotPixels, 0, width*height);
+		caSnapshot = false;
 	}
 
 
 	public void reset() {
-		if (snapshotPixels==null)
-			return;
-		System.arraycopy(snapshotPixels, 0, pixels, 0, width*height);
+		if (snapshotPixels!=null)
+			System.arraycopy(snapshotPixels, 0, pixels, 0, width*height);
 	}
 
 
@@ -222,22 +223,37 @@ public class ColorProcessor extends ImageProcessor {
 			}
 		}
 	}
+	
+	/** Used by the ContrastAdjuster */
+	public void caSnapshot(boolean set) {
+		caSnapshot = set;
+	}
 
+	/** Used by the ContrastAdjuster */
+	public boolean caSnapshot() {
+		return caSnapshot;
+	}
+	
 	/** Swaps the pixel and snapshot (undo) arrays. */
 	public void swapPixelArrays() {
-		if (snapshotPixels==null) return;	
+		if (snapshotPixels==null)
+			return;	
 		int pixel;
 		for (int i=0; i<pixels.length; i++) {
 			pixel = pixels[i];
 			pixels[i] = snapshotPixels[i];
 			snapshotPixels[i] = pixel;
 		}
+		caSnapshot = false;
 	}
 
 	public void setSnapshotPixels(Object pixels) {
+		if (caSnapshot && pixels==null)
+			return;
 		snapshotPixels = (int[])pixels;
 		snapshotWidth=width;
 		snapshotHeight=height;
+		caSnapshot = false;
 	}
 
 	/** Returns a reference to the snapshot pixel array. Used by the ContrastAdjuster. */
@@ -415,9 +431,11 @@ public class ColorProcessor extends ImageProcessor {
 	public void setPixels(Object pixels) {
 		this.pixels = (int[])pixels;
 		resetPixels(pixels);
-		if (pixels==null) snapshotPixels = null;
+		if (pixels==null)
+			snapshotPixels = null;
 		rgbRaster = null;
 		image = null;
+		caSnapshot = false;
 	}
 
 
@@ -631,7 +649,7 @@ public class ColorProcessor extends ImageProcessor {
 	
 	public static final int RGB_NOISE=0, RGB_MEDIAN=1, RGB_FIND_EDGES=2,
 		RGB_ERODE=3, RGB_DILATE=4, RGB_THRESHOLD=5, RGB_ROTATE=6,
-		RGB_SCALE=7, RGB_RESIZE=8, RGB_TRANSLATE=9;
+		RGB_SCALE=7, RGB_RESIZE=8, RGB_TRANSLATE=9, RGB_MIN=10, RGB_MAX=11;
 
  	/** Performs the specified filter on the red, green and blue planes of this image. */
  	public void filterRGB(int type, double arg) {
@@ -729,6 +747,16 @@ public class ColorProcessor extends ImageProcessor {
 				g.translate(arg, arg2); showProgress(0.65);
 				ij.IJ.showStatus("Translating blue");
 				b.translate(arg, arg2); showProgress(0.90);
+				break;
+			case RGB_MIN:
+				r.filter(MIN); showProgress(0.40);
+				g.filter(MIN); showProgress(0.65);
+				b.filter(MIN); showProgress(0.90);
+				break;
+			case RGB_MAX:
+				r.filter(MAX); showProgress(0.40);
+				g.filter(MAX); showProgress(0.65);
+				b.filter(MAX); showProgress(0.90);
 				break;
 		}
 		
@@ -926,8 +954,8 @@ public class ColorProcessor extends ImageProcessor {
 		double xlimit = width-1.0, xlimit2 = width-1.001;
 		double ylimit = height-1.0, ylimit2 = height-1.001;
 		if (interpolationMethod==BILINEAR) {
-			dstCenterX += xScale/2.0;
-			dstCenterY += yScale/2.0;
+			if (dstWidth!=width) dstCenterX+=xScale/4.0;
+			if (dstHeight!=height) dstCenterY+=yScale/4.0;
 		}
 		ImageProcessor ip2 = createProcessor(dstWidth, dstHeight);
 		int[] pixels2 = (int[])ip2.getPixels();
@@ -1121,43 +1149,66 @@ public class ColorProcessor extends ImageProcessor {
 		showProgress(1.0);
 	}
 
-	/** 3x3 unweighted smoothing. */
+	/** A 3x3 filter operation, where the argument (ImageProcessor.BLUR_MORE,  FIND_EDGES, 
+	     MEDIAN_FILTER, MIN or MAX) determines the filter type. */
 	public void filter(int type) {
-		int p1, p2, p3, p4, p5, p6, p7, p8, p9;
-		int inc = roiHeight/25;
-		if (inc<1) inc = 1;
-		
-		int[] pixels2 = (int[])getPixelsCopy();
-		int offset, rsum=0, gsum=0, bsum=0;
-        int rowOffset = width;
-		for (int y=yMin; y<=yMax; y++) {
-			offset = xMin + y * width;
-			p1 = 0;
-			p2 = pixels2[offset-rowOffset-1];
-			p3 = pixels2[offset-rowOffset];
-			p4 = 0;
-			p5 = pixels2[offset-1];
-			p6 = pixels2[offset];
-			p7 = 0;
-			p8 = pixels2[offset+rowOffset-1];
-			p9 = pixels2[offset+rowOffset];
+		if (type == FIND_EDGES)
+			filterRGB(RGB_FIND_EDGES, 0, 0);
+		else if (type == MEDIAN_FILTER)
+			filterRGB(RGB_MEDIAN, 0, 0);
+		else if (type == MIN)
+			filterRGB(RGB_MIN, 0, 0);
+		else if (type == MAX)
+			filterRGB(RGB_MAX, 0, 0);
+		else
+		    blurMore();
+	}
 
-			for (int x=xMin; x<=xMax; x++) {
+	/** BLUR MORE: 3x3 unweighted smoothing is implemented directly, does not convert the image to three ByteProcessors. */
+	private void blurMore() {
+		int p1 = 0, p2, p3, p4 = 0, p5, p6, p7 = 0, p8, p9;
+		
+		int[] prevRow = new int[width];
+		int[] thisRow = new int[width];
+		int[] nextRow = new int[width];
+		System.arraycopy(pixels, Math.max(roiY-1,0)*width, thisRow, 0, width);
+		System.arraycopy(pixels, roiY*width, nextRow, 0, width);
+		for (int y=roiY; y<roiY+roiHeight; y++) {
+			int[] tmp = prevRow;
+			prevRow = thisRow;
+			thisRow = nextRow;
+			nextRow = tmp;
+			if (y < height-1)
+				System.arraycopy(pixels, (y+1)*width, nextRow, 0, width);
+			else
+				nextRow = thisRow;
+			int offset = roiX + y*width;
+
+			p2 = prevRow[roiX==0 ? roiX : roiX-1];
+			p3 = prevRow[roiX];
+			p5 = thisRow[roiX==0 ? roiX : roiX-1];
+			p6 = thisRow[roiX];
+			p8 = nextRow[roiX==0 ? roiX : roiX-1];
+			p9 = nextRow[roiX];
+
+			for (int x=roiX; x<roiX+roiWidth; x++) {
 				p1 = p2; p2 = p3;
-				p3 = pixels2[offset-rowOffset+1];
 				p4 = p5; p5 = p6;
-				p6 = pixels2[offset+1];
 				p7 = p8; p8 = p9;
-				p9 = pixels2[offset+rowOffset+1];
-				rsum = (p1 & 0xff0000) + (p2 & 0xff0000) + (p3 & 0xff0000) + (p4 & 0xff0000) + (p5 & 0xff0000)
+				if (x < width-1) {
+					p3 = prevRow[x+1];
+					p6 = thisRow[x+1];
+					p9 = nextRow[x+1];
+				}
+				int rsum = (p1 & 0xff0000) + (p2 & 0xff0000) + (p3 & 0xff0000) + (p4 & 0xff0000) + (p5 & 0xff0000)
 					+ (p6 & 0xff0000) + (p7 & 0xff0000) + (p8 & 0xff0000) + (p9 & 0xff0000);
-				gsum = (p1 & 0xff00) + (p2 & 0xff00) + (p3 & 0xff00) + (p4 & 0xff00) + (p5 & 0xff00)
+				int gsum = (p1 & 0xff00) + (p2 & 0xff00) + (p3 & 0xff00) + (p4 & 0xff00) + (p5 & 0xff00)
 					+ (p6 & 0xff00) + (p7 & 0xff00) + (p8 & 0xff00) + (p9 & 0xff00);
-				bsum = (p1 & 0xff) + (p2 & 0xff) + (p3 & 0xff) + (p4 & 0xff) + (p5 & 0xff)
+				int bsum = (p1 & 0xff) + (p2 & 0xff) + (p3 & 0xff) + (p4 & 0xff) + (p5 & 0xff)
 					+ (p6 & 0xff) + (p7 & 0xff) + (p8 & 0xff) + (p9 & 0xff);
-				pixels[offset++] = 0xff000000 | ((rsum/9) & 0xff0000) | ((gsum/9) & 0xff00) | (bsum/9);
+				pixels[offset++] = 0xff000000 | (((rsum+(4<<16))/9) & 0xff0000) | (((gsum+(4<<8))/9) & 0xff00) | ((bsum+4)/9);
 			}
-			if (y%inc==0)
+			if (roiHeight*roiWidth>1000000 && (y&0xff)==0)
 				showProgress((double)(y-roiY)/roiHeight);
 		}
 		showProgress(1.0);
@@ -1213,6 +1264,14 @@ public class ColorProcessor extends ImageProcessor {
 		return histogram;
 	}
 
+	public synchronized boolean weightedHistogram() {
+		if (weights!=null && (weights[0]!=1d/3d||weights[1]!=1d/3d||weights[2]!=1d/3d))
+			return true;
+		if (rWeight!=1d/3d || gWeight!=1d/3d || bWeight!=1d/3d)
+			return true;
+		return false;
+	}
+
 	/** Performs a convolution operation using the specified kernel. */
 	public void convolve(float[] kernel, int kernelWidth, int kernelHeight) {
 		int size = width*height;
@@ -1264,7 +1323,7 @@ public class ColorProcessor extends ImageProcessor {
 		weights[2] = bWeight;
 		return weights;
 	}
-
+	
 	/** This is a thread-safe (non-static) version of setWeightingFactors(). */
 	public void setRGBWeights(double rweight, double gweight, double bweight) {
 		weights = new double[3];
@@ -1273,6 +1332,11 @@ public class ColorProcessor extends ImageProcessor {
 		weights[2] = bweight;
 	}
 
+	/** This is a thread-safe (non-static) version of setWeightingFactors(). */
+	public void setRGBWeights(double[] weights) {
+		this.weights = weights;
+	}
+	
 	/** Returns the values set by setRGBWeights(), or null if setRGBWeights() has not been called. */
 	public double[] getRGBWeights() {
 		return weights;

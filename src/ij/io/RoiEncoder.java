@@ -15,7 +15,7 @@ import java.awt.geom.*;
 public class RoiEncoder {
 	static final int HEADER_SIZE = 64;
 	static final int HEADER2_SIZE = 64;
-	static final int VERSION = 226; // v1.49h (point type and size)
+	static final int VERSION = 227; // v1.50d (point counters)
 	private String path;
 	private OutputStream f;
 	private final int polygon=0, rect=1, oval=2, line=3, freeline=4, polyline=5, noRoi=6, freehand=7, 
@@ -25,6 +25,9 @@ public class RoiEncoder {
 	private int roiNameSize;
 	private String roiProps;
 	private int roiPropsSize;
+	private int countersSize;
+	private int[] counters;
+
 	
 	/** Creates an RoiEncoder using the specified path. */
 	public RoiEncoder(String path) {
@@ -139,7 +142,14 @@ public class RoiEncoder {
 			}
 		}
 		
-		data = new byte[HEADER_SIZE+HEADER2_SIZE+n*4+floatSize+roiNameSize+roiPropsSize];
+		if (roi instanceof PointRoi) {
+			countersSize = 0;
+			counters = ((PointRoi)roi).getCounters();
+			if (counters!=null && counters.length>=n)
+				countersSize = n*4;
+		}
+		
+		data = new byte[HEADER_SIZE+HEADER2_SIZE+n*4+floatSize+roiNameSize+roiPropsSize+countersSize];
 		data[0]=73; data[1]=111; data[2]=117; data[3]=116; // "Iout"
 		putShort(RoiDecoder.VERSION_OFFSET, VERSION);
 		data[RoiDecoder.TYPE] = (byte)type;
@@ -194,18 +204,22 @@ public class RoiEncoder {
 			putShort(RoiDecoder.STROKE_WIDTH, point.getSize());
 		}
 
-		if (roi instanceof EllipseRoi) {
-			putShort(RoiDecoder.SUBTYPE, RoiDecoder.ELLIPSE);
-			double[] p = ((EllipseRoi)roi).getParams();
+		if (roi instanceof RotatedRectRoi || roi instanceof EllipseRoi) {
+			double[] p = null;
+			if (roi instanceof RotatedRectRoi) {
+				putShort(RoiDecoder.SUBTYPE, RoiDecoder.ROTATED_RECT);
+				p = ((RotatedRectRoi)roi).getParams();
+			} else {
+				putShort(RoiDecoder.SUBTYPE, RoiDecoder.ELLIPSE);
+				p = ((EllipseRoi)roi).getParams();
+			}
 			putFloat(RoiDecoder.X1, (float)p[0]);
 			putFloat(RoiDecoder.Y1, (float)p[1]);
 			putFloat(RoiDecoder.X2, (float)p[2]);
 			putFloat(RoiDecoder.Y2, (float)p[3]);
-			putFloat(RoiDecoder.ELLIPSE_ASPECT_RATIO, (float)p[4]);
+			putFloat(RoiDecoder.FLOAT_PARAM, (float)p[4]);
 		}
-		
-		
-
+				
 		// save stroke width, stroke color and fill color (1.43i or later)
 		if (VERSION>=218) {
 			saveStrokeWidthAndColor(roi);
@@ -215,7 +229,6 @@ public class RoiEncoder {
 			}
 		}
 		
-		// save TextRoi
 		if (n==0 && roi instanceof TextRoi)
 			saveTextRoi((TextRoi)roi);
 		else if (n==0 && roi instanceof ImageRoi)
@@ -357,7 +370,7 @@ public class RoiEncoder {
 		//ij.IJ.log("putHeader2: "+hdr2Offset+" "+roiNameSize+"  "+roiName);
 		putInt(RoiDecoder.HEADER2_OFFSET, hdr2Offset);
 		putInt(hdr2Offset+RoiDecoder.C_POSITION, roi.getCPosition());
-		putInt(hdr2Offset+RoiDecoder.Z_POSITION, roi.getZPosition());
+		putInt(hdr2Offset+RoiDecoder.Z_POSITION, roi.hasHyperStackPosition()?roi.getZPosition():0);
 		putInt(hdr2Offset+RoiDecoder.T_POSITION, roi.getTPosition());
 		Overlay proto = roi.getPrototypeOverlay();
 		Color overlayLabelColor = proto.getLabelColor();
@@ -374,7 +387,8 @@ public class RoiEncoder {
 		putFloat(hdr2Offset+RoiDecoder.FLOAT_STROKE_WIDTH, (float)strokeWidth);
 		if (roiPropsSize>0)
 			putProps(roi, hdr2Offset);
-
+		if (countersSize>0)
+			putPointCounters(roi, hdr2Offset);
 	}
 
 	void putName(Roi roi, int hdr2Offset) {
@@ -393,6 +407,13 @@ public class RoiEncoder {
 		putInt(hdr2Offset+RoiDecoder.ROI_PROPS_LENGTH, roiPropsLength);
 		for (int i=0; i<roiPropsLength; i++)
 			putShort(offset+i*2, roiProps.charAt(i));
+	}
+
+	void putPointCounters(Roi roi, int hdr2Offset) {
+		int offset = hdr2Offset+HEADER2_SIZE+roiNameSize+roiPropsSize;
+		putInt(hdr2Offset+RoiDecoder.COUNTERS_OFFSET, offset);
+		for (int i=0; i<countersSize/4; i++)
+			putInt(offset+i*4, counters[i]);
 	}
 
     void putByte(int base, int v) {

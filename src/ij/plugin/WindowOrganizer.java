@@ -5,6 +5,7 @@ import ij.gui.*;
 import ij.plugin.frame.ThresholdAdjuster;
 import java.awt.*;
 
+/** This class implements the Window menu's "Show All", "Main Window", "Cascade" and "Tile" commands. */
 public class WindowOrganizer implements PlugIn {
 
 	private static final int XSTART=4, YSTART=80, XOFFSET=8, YOFFSET=24,MAXSTEP=200,GAP=2;
@@ -38,6 +39,10 @@ public class WindowOrganizer implements PlugIn {
 			ImageWindow win = getWindow(wList[i]);
 			if (win==null)
 				continue;
+			if (win instanceof PlotWindow && !((PlotWindow)win).getPlot().isFrozen()) {
+				IJ.error("Tile", "Unfrozen plot windows cannot be tiled.");
+				return;
+			}
 			Dimension d = win.getSize();
 			int w = d.width;
 			int h = d.height + titlebarHeight;
@@ -108,6 +113,8 @@ public class WindowOrganizer implements PlugIn {
 				while (win.getSize().width*0.85>=tileWidth && canvas.getMagnification()>0.03125)
 					canvas.zoomOut(0, 0);
 				win.toFront();
+				ImagePlus imp = win.getImagePlus();
+				if (imp!=null) imp.setIJMenuBar(i==nPics-1);
 			}
 			hloc += tileWidth + GAP;
 		}
@@ -148,6 +155,8 @@ public class WindowOrganizer implements PlugIn {
 			win.toFront();
 				x += XOFFSET;
 			y += YOFFSET;
+			ImagePlus imp = win.getImagePlus();
+			if (imp!=null) imp.setIJMenuBar(i==wList.length-1);
 		}
 	}
 	

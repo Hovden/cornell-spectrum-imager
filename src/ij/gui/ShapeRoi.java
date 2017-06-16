@@ -223,6 +223,7 @@ public class ShapeRoi extends Roi {
 		setShape(new GeneralPath(at.createTransformedShape(a1)));
 		x = r.x;
 		y = r.y;
+		cachedMask = null;
 		return this;
 	}
 
@@ -438,7 +439,8 @@ public class ShapeRoi extends Roi {
 	 * @return an array of ij.gui.Roi objects.
 	 */
 	public Roi[] getRois () {
-		if (shape==null) return new Roi[0];
+		if (shape==null)
+			return new Roi[0];
 		if (savedRois!=null)
 			return getSavedRois();
 		Vector rois = new Vector();
@@ -647,6 +649,8 @@ public class ShapeRoi extends Roi {
 	/**Returns the perimeter if this ShapeRoi can be decomposed 
 		into simple ROIs, otherwise returns zero. */
 	public double getLength() {
+		if (width==0 && height==0)
+			return 0.0;
 		double length = 0.0;
 		Roi[] rois = getRois();
 		ImagePlus imp2 = getImage();
@@ -851,8 +855,9 @@ public class ShapeRoi extends Roi {
 	 * control points of the curves segments in the iteration order;
 	 * @return <strong><code>true</code></strong> if successful.*/
 	boolean parsePath(PathIterator pIter, double[] params, Vector segments, Vector rois, Vector handles) {
+		if (pIter==null || pIter.isDone())
+			return false;
 		boolean result = true;
-		if (pIter==null) return false;
 		double pw = 1.0, ph = 1.0;
 		if (imp!=null) {
 			Calibration cal = imp.getCalibration();
@@ -1009,7 +1014,7 @@ public class ShapeRoi extends Roi {
 		AffineTransform aTx = (((Graphics2D)g).getDeviceConfiguration()).getDefaultTransform();
 		Graphics2D g2d = (Graphics2D)g;
 		if (stroke!=null && !isActiveOverlayRoi)
-			g2d.setStroke(ic!=null&&ic.getCustomRoi()?stroke:getScaledStroke());
+			g2d.setStroke((ic!=null&&ic.getCustomRoi())||isCursor()?stroke:getScaledStroke());
 		mag = getMagnification();
 		int basex=0, basey=0;
 		if (ic!=null) {

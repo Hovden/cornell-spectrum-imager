@@ -46,13 +46,17 @@ public class FileOpener {
 		if (IJ.debugMode) IJ.log("FileInfo: "+fi);
 	}
 	
+	/** Opens the image and returns it has an ImagePlus object. */
+	public ImagePlus openImage() {
+		return open(false);
+	}
+
 	/** Opens the image and displays it. */
 	public void open() {
 		open(true);
 	}
 	
-	/** Opens the image. Displays it if 'show' is
-	true. Returns an ImagePlus object if successful. */
+	/** Obsolete, replaced by openImage() and open(). */
 	public ImagePlus open(boolean show) {
 
 		ImagePlus imp=null;
@@ -162,10 +166,13 @@ public class FileOpener {
 	
 	void setOverlay(ImagePlus imp, byte[][] rois) {
 		Overlay overlay = new Overlay();
+		Overlay proto = null;
 		for (int i=0; i<rois.length; i++) {
 			Roi roi = RoiDecoder.openFromByteArray(rois[i]);
-			if (i==0) {
-				Overlay proto = roi.getPrototypeOverlay();
+			if (roi==null)
+				continue;
+			if (proto==null) {
+				proto = roi.getPrototypeOverlay();
 				overlay.drawLabels(proto.getDrawLabels());
 				overlay.drawNames(proto.getDrawNames());
 				overlay.drawBackgrounds(proto.getDrawBackgrounds());
@@ -320,6 +327,13 @@ public class FileOpener {
 		Calibration cal = imp.getCalibration();
 		boolean calibrated = false;
 		if (fi.pixelWidth>0.0 && fi.unit!=null) {
+			if (fi.pixelWidth<=0.0001 && fi.unit.equals("cm")) {
+				fi.pixelWidth *= 10000.0;
+				fi.pixelHeight *= 10000.0;
+				if (fi.pixelDepth!=1.0)
+					fi.pixelDepth *= 10000.0;
+				fi.unit = "um";
+			}
 			cal.pixelWidth = fi.pixelWidth;
 			cal.pixelHeight = fi.pixelHeight;
 			cal.pixelDepth = fi.pixelDepth;
@@ -433,7 +447,7 @@ public class FileOpener {
 		else if (fi.url!=null && !fi.url.equals(""))
 			is = new URL(fi.url+fi.fileName).openStream();
 		else {
-			if (fi.directory.length()>0 && !fi.directory.endsWith(Prefs.separator))
+			if (fi.directory.length()>0 && !(fi.directory.endsWith(Prefs.separator)||fi.directory.endsWith("/")))
 				fi.directory += Prefs.separator;
 		    File f = new File(fi.directory + fi.fileName);
 		    if (gzip) fi.compression = FileInfo.COMPRESSION_UNKNOWN;
