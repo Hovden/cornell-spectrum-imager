@@ -3,7 +3,7 @@
 	<modelVersion>4.0.0</modelVersion>
 	<groupId>org.csi</groupId>
 	<artifactId>csi</artifactId>
-	<version>1.0.0</version>
+	<version>1.7.0</version>
 	<name>Cornell Spectrum Imager</name>
 	<build>
 		<sourceDirectory>src</sourceDirectory>
@@ -119,7 +119,7 @@
 		<dependency>
 			<groupId>gov.nist.math</groupId>
 			<artifactId>jama</artifactId>
-			<version>1.0.2</version>
+			<version>1.0.3</version>
 		</dependency>
 	</dependencies>
 </project>
