@@ -1,0 +1,14 @@
+run("Select All");
+name=getTitle();
+getDimensions(w,h,c,z,t);
+run("Reslice [/]...", "output=1.000 start=Top avoid");
+selectWindow(name);
+close();
+selectWindow("Reslice of "+name);
+run("Stack to Hyperstack...", "order=xyczt(default) channels="+w+" slices="+t+" frames=1 display=Grayscale");
+run("Reslice [/]...", "output=1.000 start=Left avoid");
+selectWindow("Reslice of "+name);
+close();
+selectWindow("Reslice of Reslice of "+name);
+run("Stack to Hyperstack...", "order=xyczt(default) channels=1 slices="+w+" frames="+h+" display=Grayscale");
+rename("4D Reslice of "+name);
