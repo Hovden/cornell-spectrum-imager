@@ -39,7 +39,7 @@ import ij.util.Tools;
  * By Wayne Rasband and Michael Schmid
  * Version 2009-Jun-09: obeys 'fixed y axis scale' in Edit>Options>Profile Plot Options
  */
-public class Dynamic_Profiler
+public class CSI_Dynamic_Profiler
     implements PlugIn, MouseListener, MouseMotionListener, KeyListener, ImageListener, Runnable {
     //MouseListener, MouseMotionListener, KeyListener: to detect changes to the selection of an ImagePlus
     //ImageListener: listens to changes (updateAndDraw) and closing of an image
