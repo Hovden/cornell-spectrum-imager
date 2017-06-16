@@ -256,6 +256,8 @@ public abstract class SpectrumData implements MouseListener, MouseMotionListener
 		plot.setColor(this.csi_Spectrum_Analyzer.colSubtracted);
 		plot.addPoints(x, ysubtracted, Plot.LINE);
 
+		plot.setBackgroundColor(this.csi_Spectrum_Analyzer.colBackFill);
+
 		drawWindow(X0, X1, this.csi_Spectrum_Analyzer.colBackgroundWindow, plot);
 		drawWindow(iX0, iX1, this.csi_Spectrum_Analyzer.colIntWindow, plot);
 
@@ -271,13 +273,13 @@ public abstract class SpectrumData implements MouseListener, MouseMotionListener
 		ImageProcessor ipplot = plot.getProcessor();
 		final Rectangle frame =  plot.getDrawingFrame();
 		ipplot.setColor(c);
-		int xIdraw = (int) (xI * zoomfactor - windowOffset * (zoomfactor - 1));
-		int xFdraw = (int) (xF * zoomfactor - windowOffset * (zoomfactor - 1));
+		double xIdraw = xI * zoomfactor/(size-1) - windowOffset * (zoomfactor - 1)/size;
+		double xFdraw = xF * zoomfactor/(size-1) - windowOffset * (zoomfactor - 1)/size;
 		if ((xIdraw > 0) && (xIdraw < size)) {
-			ipplot.drawRect(Plot.LEFT_MARGIN + ((plotWidth) * xIdraw) / size, Plot.TOP_MARGIN, 1, (plotHeight));
+			ipplot.drawRect(Plot.LEFT_MARGIN + ((int)(plotWidth) * xIdraw) , Plot.TOP_MARGIN, 1, (plotHeight));
 		}
 		if ((xFdraw > 0) && (xFdraw < size)) {
-			ipplot.drawRect(Plot.LEFT_MARGIN + ((plotWidth) * xFdraw) / size, Plot.TOP_MARGIN, 1, (plotHeight));
+			ipplot.drawRect(Plot.LEFT_MARGIN + ((int)(plotWidth) * xFdraw) / size, Plot.TOP_MARGIN, 1, (plotHeight));
 		}
 	}
 
