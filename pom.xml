@@ -66,7 +66,7 @@
 						<configuration>
 							<headerType>console</headerType>
 							<outfile>target/csi-v170.exe</outfile>
-							<jar>target/csi-1.7.0.jar</jar>
+							<jar>target/csi-v170.jar</jar>
 							<errTitle>csi</errTitle>
 							<classPath>
 								<mainClass>ij.ImageJ</mainClass>
