@@ -1,4 +1,10 @@
 ===============================
+What’s New in CSI Version 1.7.0
+===============================
+Added 4D data analysis capabilities
+Updated ImageJ to 1.51o
+
+===============================
 What’s New in CSI Version 1.6.1
 ===============================
 github friendly source code
