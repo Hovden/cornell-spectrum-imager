@@ -40,7 +40,6 @@ import ij.macro.*;
 public class GenericDialog extends Dialog implements ActionListener, TextListener, 
 FocusListener, ItemListener, KeyListener, AdjustmentListener, WindowListener {
 
-	public static final int MAX_SLIDERS = 25;
 	protected Vector numberField, stringField, checkbox, choice, slider, radioButtonGroups;
 	protected TextArea textArea1, textArea2;
 	protected Vector defaultValues,defaultText,defaultStrings,defaultChoiceIndexes;
@@ -64,8 +63,8 @@ FocusListener, ItemListener, KeyListener, AdjustmentListener, WindowListener {
 	private String macroOptions;
 	private int topInset, leftInset, bottomInset;
     private boolean customInsets;
-    private int[] sliderIndexes;
-    private double[] sliderScales;
+    private Vector sliderIndexes;
+    private Vector sliderScales;
     private Checkbox previewCheckbox;    // the "Preview" Checkbox, if any
     private Vector dialogListeners;             // the Objects to notify on user input
     private PlugInFilterRunner pfr;      // the PlugInFilterRunner for automatic preview
@@ -79,14 +78,28 @@ FocusListener, ItemListener, KeyListener, AdjustmentListener, WindowListener {
     private String helpURL;
     private String yesLabel, noLabel;
     private boolean smartRecording;
+    private Vector imagePanels;
+    private static GenericDialog instance;
 
     /** Creates a new GenericDialog with the specified title. Uses the current image
     	image window as the parent frame or the ImageJ frame if no image windows
     	are open. Dialog parameters are recorded by ImageJ's command recorder but
     	this requires that the first word of each label be unique. */
 	public GenericDialog(String title) {
-		this(title, WindowManager.getCurrentImage()!=null?
-			(Frame)WindowManager.getCurrentImage().getWindow():IJ.getInstance()!=null?IJ.getInstance():new Frame());
+		this(title, getParentFrame());
+	}
+	
+	private static Frame getParentFrame() {
+		Frame parent = WindowManager.getCurrentImage()!=null?
+			(Frame)WindowManager.getCurrentImage().getWindow():IJ.getInstance()!=null?IJ.getInstance():new Frame();
+		if (IJ.isMacOSX() && IJ.isJava18()) {
+			ImageJ ij = IJ.getInstance();
+			if (ij!=null && ij.isActive())
+				parent = ij;
+			else
+				parent = null;
+		}
+		return parent;
 	}
 
     /** Creates a new GenericDialog using the specified title and parent frame. */
@@ -154,7 +167,10 @@ FocusListener, ItemListener, KeyListener, AdjustmentListener, WindowListener {
 		}
 		if (IJ.isWindows()) columns -= 2;
 		if (columns<1) columns = 1;
-		TextField tf = new TextField(IJ.d2s(defaultValue, digits), columns);
+		String defaultString = IJ.d2s(defaultValue, digits);
+		if (Double.isNaN(defaultValue))
+			defaultString = "";
+		TextField tf = new TextField(defaultString, columns);
 		if (IJ.isLinux()) tf.setBackground(Color.white);
 		tf.addActionListener(this);
 		tf.addTextListener(this);
@@ -546,15 +562,18 @@ FocusListener, ItemListener, KeyListener, AdjustmentListener, WindowListener {
 	* @param columns	the number of columns
 	*/
     public void addTextAreas(String text1, String text2, int rows, int columns) {
-    	if (textArea1!=null) return;
-    	Panel panel = new Panel();
+		if (textArea1!=null) return;
+		Panel panel = new Panel();
+		Font font = new Font("SansSerif", Font.PLAIN, 14);
 		textArea1 = new TextArea(text1,rows,columns,TextArea.SCROLLBARS_NONE);
 		if (IJ.isLinux()) textArea1.setBackground(Color.white);
+		textArea1.setFont(font);
 		textArea1.addTextListener(this);
 		panel.add(textArea1);
 		if (text2!=null) {
 			textArea2 = new TextArea(text2,rows,columns,TextArea.SCROLLBARS_NONE);
 			if (IJ.isLinux()) textArea2.setBackground(Color.white);
+			textArea2.setFont(font);
 			panel.add(textArea2);
 		}
 		c.gridx = 0; c.gridy = y;
@@ -601,11 +620,10 @@ FocusListener, ItemListener, KeyListener, AdjustmentListener, WindowListener {
 		
 		if (slider==null) {
 			slider = new Vector(5);
-			sliderIndexes = new int[MAX_SLIDERS];
-			sliderScales = new double[MAX_SLIDERS];
+			sliderIndexes = new Vector(5);
+			sliderScales = new Vector(5);
 		}
 		Scrollbar s = new Scrollbar(Scrollbar.HORIZONTAL, (int)defaultValue, 1, (int)minValue, (int)maxValue+1);
-		GUI.fix(s);
 		slider.addElement(s);
 		s.addAdjustmentListener(this);
 		s.setUnitIncrement(1);
@@ -624,8 +642,8 @@ FocusListener, ItemListener, KeyListener, AdjustmentListener, WindowListener {
 		tf.addFocusListener(this);
 		tf.addKeyListener(this);
 		numberField.addElement(tf);
-		sliderIndexes[slider.size()-1] = numberField.size()-1;
-		sliderScales[slider.size()-1] = scale;
+		sliderIndexes.add(new Integer(numberField.size()-1));
+		sliderScales.add(new Double(scale));
 		defaultValues.addElement(new Double(defaultValue/scale));
 		defaultText.addElement(tf.getText());
 		tf.setEditable(true);
@@ -681,7 +699,11 @@ FocusListener, ItemListener, KeyListener, AdjustmentListener, WindowListener {
     
 	/** Adds an image to the dialog. */
     public void addImage(ImagePlus image) {
-    	addPanel(new ImagePanel(image));
+    	ImagePanel imagePanel = new ImagePanel(image);
+    	addPanel(imagePanel);
+    	if (imagePanels==null)
+    		imagePanels = new Vector();
+    	imagePanels.add(imagePanel);
     }
 
     
@@ -1145,12 +1167,14 @@ FocusListener, ItemListener, KeyListener, AdjustmentListener, WindowListener {
 			add(buttons);
 			if (IJ.isMacintosh())
 				setResizable(false);
+			if (IJ.isMacOSX()&&IJ.isJava18())
+				instance = this;
 			pack();
 			setup();
 			if (centerDialog) GUI.center(this);
 			setVisible(true);
 			recorderOn = Recorder.record;
-			IJ.wait(50); // work around for Sun/WinNT bug
+			IJ.wait(50);
 		}
 		/* For plugins that read their input only via dialogItemChanged, call it at least once */
 		if (!wasCanceled && dialogListeners!=null && dialogListeners.size()>0) {
@@ -1258,6 +1282,11 @@ FocusListener, ItemListener, KeyListener, AdjustmentListener, WindowListener {
     	super.setLocation(x, y);
     	centerDialog = false;
     }
+    
+    public void setDefaultString(int index, String str) {
+    	if (defaultStrings!=null && index>=0 && index<defaultStrings.size())
+    		defaultStrings.set(index, str);
+    }
 
     protected void setup() {
 	}
@@ -1288,15 +1317,15 @@ FocusListener, ItemListener, KeyListener, AdjustmentListener, WindowListener {
 		if (slider==null) return;
 		Object source = e.getSource();
 		for (int i=0; i<slider.size(); i++) {
-			int index = sliderIndexes[i];
+			int index = ((Integer)sliderIndexes.get(i)).intValue();
 			if (source==numberField.elementAt(index)) {
 				TextField tf = (TextField)numberField.elementAt(index);
 				double value = Tools.parseDouble(tf.getText());
 				if (!Double.isNaN(value)) {
 					Scrollbar sb = (Scrollbar)slider.elementAt(i);
-					sb.setValue((int)(value*sliderScales[i]));
+					double scale = ((Double)sliderScales.get(i)).doubleValue();
+					sb.setValue((int)(value*scale));
 				}	
-				//IJ.log(i+" "+tf.getText());
 			}
 		}
 	}
@@ -1320,7 +1349,7 @@ FocusListener, ItemListener, KeyListener, AdjustmentListener, WindowListener {
 	public void keyPressed(KeyEvent e) { 
 		int keyCode = e.getKeyCode(); 
 		IJ.setKeyDown(keyCode); 
-		if (keyCode==KeyEvent.VK_ENTER && textArea1==null) {
+		if (keyCode==KeyEvent.VK_ENTER && textArea1==null && okay!=null && okay.isEnabled()) {
 			wasOKed = true;
 			if (IJ.isMacOSX())
 				accessTextFields();
@@ -1370,9 +1399,11 @@ FocusListener, ItemListener, KeyListener, AdjustmentListener, WindowListener {
 		for (int i=0; i<slider.size(); i++) {
 			if (source==slider.elementAt(i)) {
 				Scrollbar sb = (Scrollbar)source;
-				TextField tf = (TextField)numberField.elementAt(sliderIndexes[i]);
-				int digits = sliderScales[i]==1.0?0:2;
-				tf.setText(""+IJ.d2s(sb.getValue()/sliderScales[i],digits));
+				int index = ((Integer)sliderIndexes.get(i)).intValue();
+				TextField tf = (TextField)numberField.elementAt(index);
+				double scale = ((Double)sliderScales.get(i)).doubleValue();
+				int digits = scale==1.0?0:2;
+				tf.setText(""+IJ.d2s(sb.getValue()/scale,digits));
 			}
 		}
 	}
@@ -1407,6 +1438,14 @@ FocusListener, ItemListener, KeyListener, AdjustmentListener, WindowListener {
         if (workaroundOSXbug)
         	repaint(); // OSX 10.4 bug delays update of enabled until the next input
     }
+
+	public void repaint() {
+		super.repaint();
+		if (imagePanels!=null) {
+			for (int i=0; i<imagePanels.size(); i++)
+				((ImagePanel)imagePanels.get(i)).repaint();
+		}
+	}
 
 	public void paint(Graphics g) {
 		super.paint(g);
@@ -1450,6 +1489,15 @@ FocusListener, ItemListener, KeyListener, AdjustmentListener, WindowListener {
 		return macro;
 	}
     
+	public static GenericDialog getInstance() {
+		return instance;
+	}
+
+	public void dispose() {
+		super.dispose();
+		instance = null;
+	}
+
     public void windowActivated(WindowEvent e) {}
     public void windowOpened(WindowEvent e) {}
     public void windowClosed(WindowEvent e) {}

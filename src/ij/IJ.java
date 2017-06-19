@@ -20,6 +20,9 @@ import java.applet.Applet;
 import java.io.*;
 import java.lang.reflect.*;
 import java.net.*;
+import javax.net.ssl.*;
+import java.security.cert.*;
+import java.security.KeyStore;
 
 
 /** This class consists of static utility methods. */
@@ -45,7 +48,7 @@ public class IJ {
 	private static ProgressBar progressBar;
 	private static TextPanel textPanel;
 	private static String osname, osarch;
-	private static boolean isMac, isWin, isJava16, isJava17, isJava18, isLinux, is64Bit;
+	private static boolean isMac, isWin, isJava16, isJava17, isJava18, isJava19, isLinux, is64Bit;
 	private static boolean controlDown, altDown, spaceDown, shiftDown;
 	private static boolean macroRunning;
 	private static Thread previousThread;
@@ -60,8 +63,10 @@ public class IJ {
 	private static Hashtable commandTable;
 	private static Vector eventListeners = new Vector();
 	private static String lastErrorMessage;
-	private static Properties properties;
-
+	private static Properties properties;	private static DecimalFormat[] df;
+	private static DecimalFormat[] sf;
+	private static DecimalFormatSymbols dfs;
+	private static boolean trustManagerCreated;
 			
 	static {
 		osname = System.getProperty("os.name");
@@ -73,7 +78,20 @@ public class IJ {
 			isJava16 = version.compareTo("1.5")>0;
 			isJava17 = version.compareTo("1.6")>0;
 			isJava18 = version.compareTo("1.7")>0;
+			isJava19 = version.compareTo("1.8")>0;
 		}
+		dfs = new DecimalFormatSymbols(Locale.US);
+		df = new DecimalFormat[10];
+		df[0] = new DecimalFormat("0", dfs);
+		df[1] = new DecimalFormat("0.0", dfs);
+		df[2] = new DecimalFormat("0.00", dfs);
+		df[3] = new DecimalFormat("0.000", dfs);
+		df[4] = new DecimalFormat("0.0000", dfs);
+		df[5] = new DecimalFormat("0.00000", dfs);
+		df[6] = new DecimalFormat("0.000000", dfs);
+		df[7] = new DecimalFormat("0.0000000", dfs);
+		df[8] = new DecimalFormat("0.00000000", dfs);
+		df[9] = new DecimalFormat("0.000000000", dfs);
 	}
 			
 	static void init(ImageJ imagej, Applet theApplet) {
@@ -236,10 +254,14 @@ public class IJ {
 		error(s);
 	}
 	
-    /** Starts executing a menu command in a separete thread and returns immediately. */
+    /** Runs a menu command on a separete thread and returns immediately. */
 	public static void doCommand(String command) {
-		if (ij!=null)
-			ij.doCommand(command);
+		new Executer(command, null);
+	}
+	
+    /** Runs a menu command on a separete thread, using the specified image. */
+	public static void doCommand(ImagePlus imp, String command) {
+		new Executer(command, imp);
 	}
 	
     /** Runs an ImageJ command. Does not return until 
@@ -310,6 +332,7 @@ public class IJ {
 			commandTable.put("XY Coodinates... ", "XY Coordinates... ");
 			commandTable.put("Statistics...", "Statistics");
 			commandTable.put("Channels Tool... ", "Channels Tool...");
+			commandTable.put("Profile Plot Options...", "Profile Plot Options...");
 		}
 		String command2 = (String)commandTable.get(command);
 		if (command2!=null)
@@ -539,7 +562,7 @@ public class IJ {
 		Undo.reset();
 		System.gc();
 		lastErrorMessage = "out of memory";
-		String tot = Runtime.getRuntime().totalMemory()/1048576L+"MB";
+		String tot = Runtime.getRuntime().maxMemory()/1048576L+"MB";
 		if (!memMessageDisplayed)
 			log(">>>>>>>>>>>>>>>>>>>>>>>>>>>");
 		log("<Out of memory>");
@@ -587,7 +610,7 @@ public class IJ {
 		Writes to the Java console if ImageJ is not present. */
 	public static void showMessage(String title, String msg) {
 		if (ij!=null) {
-			if (msg!=null && msg.startsWith("<html>")) {
+			if (msg!=null && (msg.startsWith("<html>")||msg.startsWith("<HTML>"))) {
 				HTMLDialog hd = new HTMLDialog(title, msg);
 				if (isMacro() && hd.escapePressed())
 					throw new RuntimeException(Macro.MACRO_CANCELED);
@@ -760,10 +783,6 @@ public class IJ {
 		return d2s(n, 2);
 	}
 	
-	private static DecimalFormat[] df;
-	private static DecimalFormat[] sf;
-	private static DecimalFormatSymbols dfs;
-
 	/** Converts a number to a rounded formatted string.
 		The 'decimalPlaces' argument specifies the number of
 		digits to the right of the decimal point (0-9). Uses
@@ -775,7 +794,7 @@ public class IJ {
 			return "3.4e38";
 		double np = n;
 		if (n<0.0) np = -n;
-		if (decimalPlaces<0) {
+		if (decimalPlaces<0) synchronized(IJ.class) {
 			decimalPlaces = -decimalPlaces;
 			if (decimalPlaces>9) decimalPlaces=9;
 			if (sf==null) {
@@ -796,20 +815,6 @@ public class IJ {
 		}
 		if (decimalPlaces<0) decimalPlaces = 0;
 		if (decimalPlaces>9) decimalPlaces = 9;
-		if (df==null) {
-			dfs = new DecimalFormatSymbols(Locale.US);
-			df = new DecimalFormat[10];
-			df[0] = new DecimalFormat("0", dfs);
-			df[1] = new DecimalFormat("0.0", dfs);
-			df[2] = new DecimalFormat("0.00", dfs);
-			df[3] = new DecimalFormat("0.000", dfs);
-			df[4] = new DecimalFormat("0.0000", dfs);
-			df[5] = new DecimalFormat("0.00000", dfs);
-			df[6] = new DecimalFormat("0.000000", dfs);
-			df[7] = new DecimalFormat("0.0000000", dfs);
-			df[8] = new DecimalFormat("0.00000000", dfs);
-			df[9] = new DecimalFormat("0.000000000", dfs);
-		}
 		return df[decimalPlaces].format(n);
 	}
 
@@ -880,9 +885,11 @@ public class IJ {
 				break;
 			case KeyEvent.VK_ALT:
 				altDown=true;
+				updateStatus();
 				break;
 			case KeyEvent.VK_SHIFT:
 				shiftDown=true;
+				updateStatus();
 				if (debugMode) beep();
 				break;
 			case KeyEvent.VK_SPACE: {
@@ -903,8 +910,8 @@ public class IJ {
 		switch (key) {
 			case KeyEvent.VK_CONTROL: controlDown=false; break;
 			case KeyEvent.VK_META: if (isMacintosh()) controlDown=false; break;
-			case KeyEvent.VK_ALT: altDown=false; break;
-			case KeyEvent.VK_SHIFT: shiftDown=false; if (debugMode) beep(); break;
+			case KeyEvent.VK_ALT: altDown=false; updateStatus(); break;
+			case KeyEvent.VK_SHIFT: shiftDown=false; updateStatus();  if (debugMode) beep(); break;
 			case KeyEvent.VK_SPACE:
 				spaceDown=false;
 				ImageWindow win = WindowManager.getCurrentWindow();
@@ -913,6 +920,17 @@ public class IJ {
 			case ALL_KEYS:
 				shiftDown=controlDown=altDown=spaceDown=false;
 				break;
+		}
+	}
+	
+	private static void updateStatus() {
+		ImagePlus imp = WindowManager.getCurrentImage();
+		if (imp!=null) {
+			ImageCanvas ic = imp.getCanvas();
+			if (ic!=null && imp.getCalibration().scaled()) {
+				Point p = ic.getCursorLoc();
+				imp.mouseMoved(p.x, p.y);
+			}
 		}
 	}
 	
@@ -964,6 +982,11 @@ public class IJ {
 	/** Returns true if ImageJ is running on a Java 1.8 or greater JVM. */
 	public static boolean isJava18() {
 		return isJava18;
+	}
+
+	/** Returns true if ImageJ is running on a Java 1.9 or greater JVM. */
+	public static boolean isJava19() {
+		return isJava19;
 	}
 
 	/** Returns true if ImageJ is running on Linux. */
@@ -1186,21 +1209,31 @@ public class IJ {
 	}
 
 	/** Sets the lower and upper threshold levels of the specified image and updates the display using
-		the specified <code>displayMode</code> ("Red", "Black & White", "Over/Under" or "No Update"). */
+		the specified <code>displayMode</code> ("Red", "Black & White", "Over/Under" or "No Update").
+		With calibrated images, 'lowerThreshold' and 'upperThreshold' must be density calibrated values.
+		Use setRawThreshold() to set the threshold using raw (uncalibrated) values. */
 	public static void setThreshold(ImagePlus img, double lowerThreshold, double upperThreshold, String displayMode) {
+		Calibration cal = img.getCalibration();
+		if (displayMode==null || !displayMode.contains("raw")) {
+			lowerThreshold = cal.getRawValue(lowerThreshold); 
+			upperThreshold = cal.getRawValue(upperThreshold);
+		}
+		setRawThreshold(img, lowerThreshold, upperThreshold, displayMode);
+	}
+
+	/** This is a version of setThreshold() that always uses raw (uncalibrated) values
+		 in the range 0-255 for 8-bit images and 0-65535 for 16-bit images. */
+	public static void setRawThreshold(ImagePlus img, double lowerThreshold, double upperThreshold, String displayMode) {
 		int mode = ImageProcessor.RED_LUT;
 		if (displayMode!=null) {
 			displayMode = displayMode.toLowerCase(Locale.US);
-			if (displayMode.indexOf("black")!=-1)
+			if (displayMode.contains("black"))
 				mode = ImageProcessor.BLACK_AND_WHITE_LUT;
-			else if (displayMode.indexOf("over")!=-1)
+			else if (displayMode.contains("over"))
 				mode = ImageProcessor.OVER_UNDER_LUT;
-			else if (displayMode.indexOf("no")!=-1)
+			else if (displayMode.contains("no"))
 				mode = ImageProcessor.NO_LUT_UPDATE;
 		}
-		Calibration cal = img.getCalibration();
-		lowerThreshold = cal.getRawValue(lowerThreshold); 
-		upperThreshold = cal.getRawValue(upperThreshold); 
 		img.getProcessor().setThreshold(lowerThreshold, upperThreshold, mode);
 		if (mode!=ImageProcessor.NO_LUT_UPDATE && img.getWindow()!=null) {
 			img.getProcessor().setLutAnimation(true);
@@ -1300,9 +1333,11 @@ public class IJ {
 				WindowManager.setWindow(win);
 			}
 			long start = System.currentTimeMillis();
-			// timeout after 2 seconds unless current thread is event dispatch thread
+			// timeout after 1 second unless current thread is event dispatch thread
 			String thread = Thread.currentThread().getName();
-			int timeout = thread!=null&&thread.indexOf("EventQueue")!=-1?0:2000;
+			int timeout = thread!=null&&thread.indexOf("EventQueue")!=-1?0:1000;
+			if (IJ.isMacOSX() && IJ.isJava18() && timeout>0)
+				timeout = 250;  //work around OS X/Java 8 window activation bug
 			while (true) {
 				wait(10);
 				imp = WindowManager.getCurrentImage();
@@ -1617,8 +1652,8 @@ public class IJ {
 		if (imp!=null) imp.show();
 	}
 
-	/** Opens the specified file as a tiff, bmp, dicom, fits, pgm, gif 
-		or jpeg image and returns an ImagePlus object if successful.
+	/** Opens the specified file as a tiff, bmp, dicom, fits, pgm, gif, jpeg 
+		or text image and returns an ImagePlus object if successful.
 		Calls HandleExtraFileTypes plugin if the file type is not recognised.
 		Displays a file open dialog if 'path' is null or an empty string.
 		Note that 'path' can also be a URL. Some reader plugins, including
@@ -1648,14 +1683,18 @@ public class IJ {
 		Returns "<Error: message>" if there an error, including
 		host or file not found. */
 	public static String openUrlAsString(String url) {
+		//if (!trustManagerCreated && url.contains("nih.gov")) trustAllCerts();
+		url = Opener.updateUrl(url);
+		if (debugMode) log("OpenUrlAsString: "+url);
 		StringBuffer sb = null;
 		url = url.replaceAll(" ", "%20");
 		try {
+			//if (url.contains("nih.gov")) addRootCA();
 			URL u = new URL(url);
 			URLConnection uc = u.openConnection();
 			long len = uc.getContentLength();
-			if (len>1048576L)
-				return "<Error: file is larger than 1MB>";
+			if (len>5242880L)
+				return "<Error: file is larger than 5MB>";
 			InputStream in = u.openStream();
 			BufferedReader br = new BufferedReader(new InputStreamReader(in));
 			sb = new StringBuffer() ;
@@ -1671,6 +1710,49 @@ public class IJ {
 		else
 			return "";
 	}
+	
+	/* 
+	public static void addRootCA() throws Exception {
+		String path = "/Users/wayne/Downloads/Certificates/lets-encrypt-x1-cross-signed.pem";
+		InputStream fis = new BufferedInputStream(new FileInputStream(path));
+		Certificate ca = CertificateFactory.getInstance("X.509").generateCertificate(fis);
+		KeyStore ks = KeyStore.getInstance(KeyStore.getDefaultType());
+		ks.load(null, null);
+		ks.setCertificateEntry(Integer.toString(1), ca);
+		TrustManagerFactory tmf = TrustManagerFactory.getInstance(TrustManagerFactory.getDefaultAlgorithm());
+		tmf.init(ks);
+		SSLContext ctx = SSLContext.getInstance("TLS");
+		ctx.init(null, tmf.getTrustManagers(), null); 
+		HttpsURLConnection.setDefaultSSLSocketFactory(ctx.getSocketFactory());
+	}
+	*/
+	
+	/*
+	// Create a new trust manager that trust all certificates
+	// http://stackoverflow.com/questions/10135074/download-file-from-https-server-using-java
+	private static void trustAllCerts() {
+		trustManagerCreated = true;
+		TrustManager[] trustAllCerts = new TrustManager[] {
+			new X509TrustManager() {
+				public java.security.cert.X509Certificate[] getAcceptedIssuers() {
+					return null;
+				}
+				public void checkClientTrusted (java.security.cert.X509Certificate[] certs, String authType) {
+				}
+				public void checkServerTrusted (java.security.cert.X509Certificate[] certs, String authType) {
+				}
+			}
+		};
+		// Activate the new trust manager
+		try {
+			SSLContext sc = SSLContext.getInstance("SSL");
+			sc.init(null, trustAllCerts, new java.security.SecureRandom());
+			HttpsURLConnection.setDefaultSSLSocketFactory(sc.getSocketFactory());
+		} catch (Exception e) {
+			IJ.log(""+e);
+		}
+	}
+	*/
 
 	/** Saves the current image, lookup table, selection or text window to the specified file path. 
 		The path must end in ".tif", ".jpg", ".gif", ".zip", ".raw", ".avi", ".bmp", ".fits", ".pgm", ".png", ".lut", ".roi" or ".txt".  */
@@ -1731,7 +1813,7 @@ public class IJ {
 			path = updateExtension(path, ".txt");
 			format = "Text Image...";
 		} else if (format.indexOf("text")!=-1 || format.indexOf("txt")!=-1) {
-			if (path!=null && !path.endsWith(".xls") && !path.endsWith(".csv"))
+			if (path!=null && !path.endsWith(".xls") && !path.endsWith(".csv") && !path.endsWith(".tsv"))
 				path = updateExtension(path, ".txt");
 			format = "Text...";
 		} else if (format.indexOf("zip")!=-1) {

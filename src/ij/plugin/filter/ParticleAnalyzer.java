@@ -90,7 +90,7 @@ public class ParticleAnalyzer implements PlugInFilter, Measurements {
 	private static double staticMaxSize = DEFAULT_MAX_SIZE;
 	private static boolean pixelUnits;
 	private static int staticOptions = Prefs.getInt(OPTIONS,CLEAR_WORKSHEET);
-	private static String[] showStrings = {"Nothing", "Outlines", "Bare Outlines", "Ellipses", "Masks", "Count Masks", "Overlay Outlines", "Overlay Masks"};
+	private static String[] showStrings = {"Nothing", "Outlines", "Bare Outlines", "Ellipses", "Masks", "Count Masks", "Overlay", "Overlay Masks"};
 	private static double staticMinCircularity=0.0, staticMaxCircularity=1.0;
 		
 	protected static final int NOTHING=0, OUTLINES=1, BARE_OUTLINES=2, ELLIPSES=3, MASKS=4, ROI_MASKS=5,
@@ -252,6 +252,7 @@ public class ParticleAnalyzer implements PlugInFilter, Measurements {
 		if (imp.getType()==ImagePlus.COLOR_RGB) {
 			ip = (ImageProcessor)imp.getProperty("Mask");
 			ip.setThreshold(255, 255, ImageProcessor.NO_LUT_UPDATE);
+			ip.setRoi(imp.getRoi());
 		}		
 		if (!analyze(imp, ip))
 			canceled = true;
@@ -354,8 +355,10 @@ public class ParticleAnalyzer implements PlugInFilter, Measurements {
 		double maxc = minAndMax.length==2?gd.parseDouble(minAndMax[1]):Double.NaN;
 		minCircularity = Double.isNaN(minc)?0.0:minc;
 		maxCircularity = Double.isNaN(maxc)?1.0:maxc;
-		if (minCircularity<0.0 || minCircularity>1.0) minCircularity = 0.0;
-		if (maxCircularity<minCircularity || maxCircularity>1.0) maxCircularity = 1.0;
+		if (minCircularity<0.0) minCircularity = 0.0;
+		if (minCircularity>maxCircularity && maxCircularity==1.0) minCircularity = 0.0;
+		if (minCircularity>maxCircularity) minCircularity = maxCircularity;
+		if (maxCircularity<minCircularity) maxCircularity = minCircularity;
 		if (minCircularity==1.0 && maxCircularity==1.0) minCircularity = 0.0;
 		staticMinCircularity = minCircularity;
 		staticMaxCircularity = maxCircularity;
@@ -402,13 +405,17 @@ public class ParticleAnalyzer implements PlugInFilter, Measurements {
 
 	boolean updateMacroOptions() {
 		String options = Macro.getOptions();
+		options = options.replace("show=[Overlay Outlines]", "show=Overlay");
+		Macro.setOptions(options);
 		int index = options.indexOf("maximum=");
-		if (index==-1) return false;
+		if (index==-1)
+			return false;
 		index +=8;
 		int len = options.length();
 		while (index<len-1 && options.charAt(index)!=' ')
 			index++;
-		if (index==len-1) return false;
+		if (index==len-1)
+			return false;
 		int min = (int)Tools.parseDouble(Macro.getValue(options, "minimum", "1"));
 		int max = (int)Tools.parseDouble(Macro.getValue(options, "maximum", "999999"));
 		options = "size="+min+"-"+max+options.substring(index, len);
@@ -509,8 +516,18 @@ public class ParticleAnalyzer implements PlugInFilter, Measurements {
 		if (measurements==0)
 			measurements = Analyzer.getMeasurements();
 		measurements &= ~LIMIT;	 // ignore "Limit to Threshold"
-		if (rt==null)
-			rt = Analyzer.getResultsTable();
+		if (rt==null) {
+			Frame table = WindowManager.getFrame("Results");
+			if (!showResults && table!=null) {
+				rt = new ResultsTable();
+				if (resetCounter && table instanceof TextWindow) {
+					IJ.run("Clear Results");
+					((TextWindow)table).close();
+					rt = Analyzer.getResultsTable();
+				}
+			} else
+				rt = Analyzer.getResultsTable();
+		}
 		analyzer = new Analyzer(imp, measurements, rt);
 		if (resetCounter && slice==1 && rt.getCounter()>0) {
 			if (!Analyzer.resetCounter())
@@ -588,12 +605,8 @@ public class ParticleAnalyzer implements PlugInFilter, Measurements {
 		ip.reset();
 		if (displaySummary && IJ.getInstance()!=null)
 			updateSliceSummary();
-		if (addToManager && roiManager!=null) {
-			if (imp.getWindow()!=null)
-				roiManager.setEditMode(imp, true);
-			else
-				roiManager.runCommand("show all with labels");
-		}
+		if (addToManager && roiManager!=null)
+			roiManager.setEditMode(imp, true);
 		maxParticleCount = (particleCount > maxParticleCount) ? particleCount : maxParticleCount;
 		totalCount += particleCount;
 		if (!canceled)
@@ -851,10 +864,10 @@ public class ParticleAnalyzer implements PlugInFilter, Measurements {
 			}
 		}
 		ImageProcessor mask = ip2.getMask();
-		if (minCircularity>0.0 || maxCircularity<1.0) {
+		if (minCircularity>0.0 || maxCircularity!=1.0) {
 			double perimeter = roi.getLength();
 			double circularity = perimeter==0.0?0.0:4.0*Math.PI*(stats.pixelCount/(perimeter*perimeter));
-			if (circularity>1.0) circularity = 1.0;
+			if (circularity>1.0 && maxCircularity<=1.0) circularity = 1.0;
 			if (circularity<minCircularity || circularity>maxCircularity) include = false;
 		}
 		if (stats.pixelCount>=minSize && stats.pixelCount<=maxSize && include) {
@@ -887,9 +900,14 @@ public class ParticleAnalyzer implements PlugInFilter, Measurements {
 	}
 
 	/** Saves statistics for one particle in a results table. This is
-		a method subclasses may want to override. */
+		a method subclasses can override. */
 	protected void saveResults(ImageStatistics stats, Roi roi) {
 		analyzer.saveResults(stats, roi);
+		if (maxCircularity>1.0 && rt.columnExists("Circ.") && rt.getValue("Circ.", rt.size()-1)==1.0) {
+			double perimeter = roi.getLength();
+			double circularity = perimeter==0.0?0.0:4.0*Math.PI*(stats.pixelCount/(perimeter*perimeter));
+			rt.addValue("Circ.", circularity);
+		}
 		if (recordStarts) {
 			rt.addValue("XStart", stats.xstart);
 			rt.addValue("YStart", stats.ystart);

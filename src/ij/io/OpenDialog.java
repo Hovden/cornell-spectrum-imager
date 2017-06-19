@@ -150,6 +150,13 @@ import javax.swing.filechooser.*;
 			if (sharedFrame==null) sharedFrame = new Frame();
 			parent = sharedFrame;
 		}
+		if (IJ.isMacOSX() && IJ.isJava18()) {
+			ImageJ ij = IJ.getInstance();
+			if (ij!=null && ij.isActive())
+				parent = ij;
+			else
+				parent = null;
+		}
 		FileDialog fd = new FileDialog(parent, title);
 		if (path!=null)
 			fd.setDirectory(path);
@@ -214,7 +221,7 @@ import javax.swing.filechooser.*;
 	/** Sets the current working directory. */
 	public static void setDefaultDirectory(String defaultDir) {
 		defaultDirectory = defaultDir;
-		if (!defaultDirectory.endsWith(File.separator) && !defaultDirectory.endsWith("/"))
+		if (defaultDirectory!=null && !defaultDirectory.endsWith(File.separator) && !defaultDirectory.endsWith("/"))
 			defaultDirectory = defaultDirectory + File.separator;
 	}
 	

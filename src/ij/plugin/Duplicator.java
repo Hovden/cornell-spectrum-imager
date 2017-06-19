@@ -18,39 +18,45 @@ import ij.measure.Calibration;
    img2.show();
 </pre>
 */
-public class Duplicator implements PlugIn, TextListener {
-	private static boolean duplicateStack;
-	private boolean duplicateSubstack;
+public class Duplicator implements PlugIn, TextListener, ItemListener {
+	private static boolean staticDuplicateStack;
+	private boolean duplicateStack;
 	private int first, last;
 	private Checkbox checkbox;
-	private TextField rangeField;
+	private TextField titleField, rangeField;
 	private TextField[] rangeFields;
 	private int firstC, lastC, firstZ, lastZ, firstT, lastT;
-	private boolean isCommand;
+	private String defaultTitle;
+	private String sliceLabel;
+	private ImagePlus imp;
+	private boolean legacyMacro;
+	private boolean titleChanged;
+	private GenericDialog gd;
 
 	public void run(String arg) {
-		isCommand = true;
-		ImagePlus imp = IJ.getImage();
+		imp = IJ.getImage();
 		int stackSize = imp.getStackSize();
 		String title = imp.getTitle();
 		String newTitle = WindowManager.getUniqueName(title);
+		defaultTitle = newTitle;
+		duplicateStack = staticDuplicateStack && !IJ.isMacro();
 		if (!IJ.altKeyDown()||stackSize>1) {
 			if (imp.isHyperStack() || imp.isComposite()) {
 				duplicateHyperstack(imp, newTitle);
 				return;
 			} else
-				newTitle = showDialog(imp, "Duplicate...", "Title: ", newTitle);
+				newTitle = showDialog(imp, "Duplicate...", "Title: ");
 		}
 		if (newTitle==null)
 			return;
 		ImagePlus imp2;
 		Roi roi = imp.getRoi();
-		if (duplicateSubstack && (first>1||last<stackSize))
+		if (duplicateStack && (first>1||last<stackSize))
 			imp2 = run(imp, first, last);
 		else if (duplicateStack || imp.getStackSize()==1)
 			imp2 = run(imp);
 		else
-			imp2 = duplicateImage(imp);
+			imp2 = crop(imp);
 		Calibration cal = imp2.getCalibration();
 		if (roi!=null && (cal.xOrigin!=0.0||cal.yOrigin!=0.0)) {
 			cal.xOrigin -= roi.getBounds().x;
@@ -65,15 +71,14 @@ public class Duplicator implements PlugIn, TextListener {
 		imp2.show();
 		if (stackSize>1 && imp2.getStackSize()==stackSize)
 			imp2.setSlice(imp.getCurrentSlice());
-
 	}
                 
-	/** Returns a copy of the image, stack or hyperstack contained in the specified ImagePlus. */
+	/** Returns a copy of the image, stack or hyperstack contained in the specified ImagePlus.
+	* @see ij.ImagePlus#duplicate
+	*/
 	public ImagePlus run(ImagePlus imp) {
-   		if (Recorder.record&&isCommand)
-   			Recorder.recordCall("imp = new Duplicator().run(imp);");
 		if (imp.getStackSize()==1)
-			return duplicateImage(imp);
+			return crop(imp);
 		Rectangle rect = null;
 		Roi roi = imp.getRoi();
 		Roi roi2 = cropRoi(imp, roi);
@@ -108,10 +113,15 @@ public class Duplicator implements PlugIn, TextListener {
 		Overlay overlay = imp.getOverlay();
 		if (overlay!=null && !imp.getHideOverlay())
 			imp2.setOverlay(overlay.crop(rect));
+   		if (Recorder.record)
+   			Recorder.recordCall("imp2 = imp.duplicate();");
 		return imp2;
 	}
 	
-	ImagePlus duplicateImage(ImagePlus imp) {
+	/** Returns a copy the current stack image, cropped if there is a selection.
+	* @see ij.ImagePlus#crop
+	*/
+	public ImagePlus crop(ImagePlus imp) {
 		ImageProcessor ip = imp.getProcessor();
 		ImageProcessor ip2 = ip.crop();
 		ImagePlus imp2 = imp.createImagePlus();
@@ -136,6 +146,12 @@ public class Duplicator implements PlugIn, TextListener {
  				overlay2.crop(imp.getCurrentSlice(), imp.getCurrentSlice());
  			imp2.setOverlay(overlay2);
  		}
+   		if (Recorder.record) {
+   			if (imp.getStackSize()==1)
+   				Recorder.recordCall("imp2 = imp.duplicate();");
+   			else
+   				Recorder.recordCall("imp2 = imp.crop();");
+   		}
 		return imp2;
 	}
 	
@@ -146,6 +162,9 @@ public class Duplicator implements PlugIn, TextListener {
 		if (roi!=null && roi.isArea())
 			rect = roi.getBounds();
 		ImageStack stack = imp.getStack();
+		boolean virtualStack = stack.isVirtual();
+		double min = imp.getDisplayRangeMin();
+		double max = imp.getDisplayRangeMax();
 		ImageStack stack2 = null;
 		for (int i=firstSlice; i<=lastSlice; i++) {
 			if (stack.isVirtual())
@@ -168,14 +187,16 @@ public class Duplicator implements PlugIn, TextListener {
 			imp2.setDimensions(1, 1, size);
 		else
 			imp2.setDimensions(1, size, 1);
+		if (virtualStack)
+			imp2.setDisplayRange(min, max);
 		Overlay overlay = imp.getOverlay();
 		if (overlay!=null && !imp.getHideOverlay()) {
 			Overlay overlay2 = overlay.crop(rect);
 			overlay2.crop(firstSlice, lastSlice);
 			imp2.setOverlay(overlay2);
 		}
-   		if (Recorder.record&&isCommand)
-   			Recorder.recordCall("imp = new Duplicator().run(imp, "+firstSlice+", "+lastSlice+");");
+   		if (Recorder.record)
+   			Recorder.recordCall("imp2 = new Duplicator().run(imp, "+firstSlice+", "+lastSlice+");");
 		return imp2;
 	}
 
@@ -232,30 +253,36 @@ public class Duplicator implements PlugIn, TextListener {
 			overlay2.crop(firstC, lastC, firstZ, lastZ, firstT, lastT);
 			imp2.setOverlay(overlay2);
 		}
-   		if (Recorder.record&&isCommand)
-   			Recorder.recordCall("imp = new Duplicator().run(imp, "+firstC+", "+lastC+", "+firstZ+", "+lastZ+", "+firstT+", "+lastT+");");
+   		if (Recorder.record)
+   			Recorder.recordCall("imp2 = new Duplicator().run(imp, "+firstC+", "+lastC+", "+firstZ+", "+lastZ+", "+firstT+", "+lastT+");");
 		return imp2;
 	}
 
-	String showDialog(ImagePlus imp, String title, String prompt, String defaultString) {
+	String showDialog(ImagePlus imp, String dialogTitle, String prompt) {
 		int stackSize = imp.getStackSize();
-		duplicateSubstack = stackSize>1 && (stackSize==imp.getNSlices()||stackSize==imp.getNFrames());
-		GenericDialog gd = new GenericDialog(title);
-		gd.addStringField(prompt, defaultString, duplicateSubstack?15:20);
+		String options = Macro.getOptions();
+		boolean isMacro = options!=null;
+		duplicateStack = stackSize>1 && duplicateStack && !isMacro;
+		legacyMacro = options!=null && (options.contains("duplicate")||!options.contains("use"));
+		String title = getNewTitle();
+		if (title==null) title=defaultTitle;
+		GenericDialog gd = new GenericDialog(dialogTitle);
+		this.gd = gd;
+		gd.addStringField(prompt, title, 15);
 		if (stackSize>1) {
-			boolean duplicate = duplicateStack && !IJ.isMacro();
-			String msg = duplicateSubstack?"Duplicate stack":"Duplicate entire stack";
-			gd.addCheckbox(msg, duplicate||imp.isComposite());
-			if (duplicateSubstack) {
-				gd.setInsets(2, 30, 3);
-				gd.addStringField("Range:", "1-"+stackSize);
-				Vector v = gd.getStringFields();
-				rangeField = (TextField)v.elementAt(1);
-				rangeField.addTextListener(this);
+			gd.addCheckbox("Duplicate stack", duplicateStack);
+			gd.setInsets(2, 30, 3);
+			gd.addStringField("Range:", "1-"+stackSize);
+			if (!isMacro) {
 				checkbox = (Checkbox)(gd.getCheckboxes().elementAt(0));
+				checkbox.addItemListener(this);
+				Vector v = gd.getStringFields();
+				titleField = (TextField)v.elementAt(0);
+				rangeField = (TextField)v.elementAt(1);
+				titleField.addTextListener(this);
+				rangeField.addTextListener(this);
 			}
-		} else
-			duplicateStack = false;
+		}
 		gd.setSmartRecording(true);
 		gd.showDialog();
 		if (gd.wasCanceled())
@@ -263,7 +290,7 @@ public class Duplicator implements PlugIn, TextListener {
 		title = gd.getNextString();
 		if (stackSize>1) {
 			duplicateStack = gd.getNextBoolean();
-			if (duplicateStack && duplicateSubstack) {
+			if (duplicateStack) {
 				String[] range = Tools.split(gd.getNextString(), " -");
 				double d1 = gd.parseDouble(range[0]);
 				double d2 = range.length==2?gd.parseDouble(range[1]):Double.NaN;
@@ -275,6 +302,27 @@ public class Duplicator implements PlugIn, TextListener {
 			} else {
 				first = 1;
 				last = stackSize;
+			}
+		}
+		if (!isMacro)
+			staticDuplicateStack = duplicateStack;
+		if (Recorder.record && titleField!=null && titleField.getText().equals(sliceLabel))
+			Recorder.recordOption("use");
+		return title;
+	}
+	
+	private String getNewTitle() {
+		if (titleChanged)
+			return null;
+		String title = defaultTitle;
+		if (imp.getStackSize()>1 && !duplicateStack && !legacyMacro && (checkbox==null||!checkbox.getState())) {
+			ImageStack stack = imp.getStack();
+			String label = stack.getShortSliceLabel(imp.getCurrentSlice());
+			if (label!=null && label.length()==0)
+				label = null;
+			if (label!=null) {
+				title = label;
+				sliceLabel = label;
 			}
 		}
 		return title;
@@ -320,10 +368,12 @@ public class Duplicator implements PlugIn, TextListener {
 		int nSlices = imp.getNSlices();
 		int nFrames = imp.getNFrames();
 		boolean composite = imp.isComposite() && nChannels==imp.getStackSize();
+		String options = Macro.getOptions();
+		boolean isMacro = options!=null;
 		GenericDialog gd = new GenericDialog("Duplicate");
 		gd.addStringField("Title:", newTitle, 15);
 		gd.setInsets(12, 20, 8);
-		gd.addCheckbox("Duplicate hyperstack", (duplicateStack&&!IJ.isMacro())||composite);
+		gd.addCheckbox("Duplicate hyperstack", (duplicateStack&&!isMacro)||composite);
 		int nRangeFields = 0;
 		if (nChannels>1) {
 			gd.setInsets(2, 30, 3);
@@ -340,13 +390,16 @@ public class Duplicator implements PlugIn, TextListener {
 			gd.addStringField("Frames (t):", "1-"+nFrames);
 			nRangeFields++;
 		}
-		Vector v = gd.getStringFields();
-		rangeFields = new TextField[3];
-		for (int i=0; i<nRangeFields; i++) {
-			rangeFields[i] = (TextField)v.elementAt(i+1);
-			rangeFields[i].addTextListener(this);
+		if (!isMacro) {
+			checkbox = (Checkbox)(gd.getCheckboxes().elementAt(0));
+			checkbox.addItemListener(this);
+			Vector v = gd.getStringFields();
+			rangeFields = new TextField[3];
+			for (int i=0; i<nRangeFields; i++) {
+				rangeFields[i] = (TextField)v.elementAt(i+1);
+				rangeFields[i].addTextListener(this);
+			}
 		}
-		checkbox = (Checkbox)(gd.getCheckboxes().elementAt(0));
 		gd.setSmartRecording(true);
 		gd.showDialog();
 		if (gd.wasCanceled())
@@ -386,6 +439,8 @@ public class Duplicator implements PlugIn, TextListener {
 			if (firstT>lastT) {firstT=1; lastT=nFrames;}
 		} else
 			firstT = lastT = 1;
+		if (!isMacro)
+			staticDuplicateStack = duplicateStack;
 		return newTitle;
 	}
 	
@@ -416,7 +471,24 @@ public class Duplicator implements PlugIn, TextListener {
 	}
 
 	public void textValueChanged(TextEvent e) {
-		checkbox.setState(true);
+		if (IJ.debugMode) IJ.log("Duplicator.textValueChanged: "+e);
+		if (e.getSource()==titleField) {
+			if (!titleField.getText().equals(getNewTitle()))
+				titleChanged = true;
+		} else
+			checkbox.setState(true);
 	}
+	
+	public void itemStateChanged(ItemEvent e) {
+		duplicateStack = checkbox.getState();
+		if (titleField!=null) {
+			String title = getNewTitle();
+			if (title!=null && !title.equals(titleField.getText())) {
+				titleField.setText(title);
+				if (gd!=null) gd.setDefaultString(0, title);
+			}
+		}
+	}
+
 	
 }

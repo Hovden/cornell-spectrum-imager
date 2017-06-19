@@ -76,6 +76,7 @@ public class FloatProcessor extends ImageProcessor {
 				pixels[i++] = (float)array[x][y];
 			}
 		}
+		resetRoi();
 	}
 
 	/**
@@ -487,7 +488,12 @@ public class FloatProcessor extends ImageProcessor {
 		}
 	}
 
-	public void invert() {process(INVERT, 0.0);}
+	/** Each pixel in the image is inverted using p=max-(p-min), where 'min'
+		and 'max' are the display range limits set using setMinAndMax(). */
+	public void invert() {
+		process(INVERT, 0.0);
+	}
+	
 	public void add(int value) {process(ADD, value);}
 	public void add(double value) {process(ADD, value);}
 	public void set(double value) {process(SET, value);}
@@ -726,7 +732,7 @@ public class FloatProcessor extends ImageProcessor {
 	}
 	
 	/** Returns a duplicate of this image. */ 
-	public ImageProcessor duplicate() { 
+	public ImageProcessor duplicate() {
 		ImageProcessor ip2 = createProcessor(width, height); 
 		float[] pixels2 = (float[])ip2.getPixels(); 
 		System.arraycopy(pixels, 0, pixels2, 0, width*height); 
@@ -864,8 +870,8 @@ public class FloatProcessor extends ImageProcessor {
 		double xScale = (double)dstWidth/roiWidth;
 		double yScale = (double)dstHeight/roiHeight;
 		if (interpolationMethod!=NONE) {
-			dstCenterX += xScale/2.0;
-			dstCenterY += yScale/2.0;
+			if (dstWidth!=width) dstCenterX+=xScale/4.0;
+			if (dstHeight!=height) dstCenterY+=yScale/4.0;
 		}
 		int inc = getProgressIncrement(dstWidth,dstHeight);
 		ImageProcessor ip2 = createProcessor(dstWidth, dstHeight);

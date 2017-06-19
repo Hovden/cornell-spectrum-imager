@@ -252,29 +252,42 @@ public class MaximumFinder implements ExtendedPlugInFilter, DialogListener {
     }
 
 	/**
-	* Calculates peak positions of 1D array N.Vischer, 13-sep-2013
+	* Calculates peak positions of 1D array N.Vischer, 06-mar-2017
 	*
 	* @param xx Array containing peaks.
 	* @param tolerance Depth of a qualified valley must exceed tolerance.
 	* Tolerance must be >= 0. Flat tops are marked at their centers.
-	* @param  excludeOnEdges If 'true', a peak is only
-	* accepted if it is separated by two qualified valleys. If 'false', a peak
-	* is also accepted if separated by one qualified valley and by a border.
+	* @param  edgeMode 0=include, 1=exclude, 3=circular
+	* edgeMode = 0 (include edges) peak may be separated by one qualified valley and by a border.
+	* edgeMode = 1 (exclude edges) peak must be separated by two qualified valleys
+	* edgeMode = 2 (circular) array is regarded to be circular
 	* @return Positions of peaks, sorted with decreasing amplitude
 	*/
-	public static int[] findMaxima(double[] xx, double tolerance, boolean excludeOnEdges) {
-		boolean includeEdge = !excludeOnEdges;
+	public static int[] findMaxima(double[] xx, double tolerance, int edgeMode ) {
+		final int INCLUDE_EDGE = 0;
+		final int CIRCULAR = 2;
 		int len = xx.length;
+		int origLen = len;
 		if (len<2)
 			return new int[0];
 		if (tolerance < 0)
 			tolerance = 0;
+		if(edgeMode==CIRCULAR){ 
+		    double[] cascade3 = new double[len * 3];
+		    for (int jj = 0; jj <len; jj++){
+			cascade3[jj] = xx[jj];
+			cascade3[jj + len] = xx[jj];
+			cascade3[jj + 2*len] = xx[jj];
+		    }
+		    len *= 3;
+		    xx = cascade3;
+		}
 		int[] maxPositions = new int[len];
 		double max = xx[0];
 		double min = xx[0];
 		int maxPos = 0;
 		int lastMaxPos = -1;
-		boolean leftValleyFound = includeEdge;
+		boolean leftValleyFound = (edgeMode == INCLUDE_EDGE);
 		int maxCount = 0;
 		for (int jj = 1; jj < len; jj++) {
 			double val = xx[jj];
@@ -299,7 +312,7 @@ public class MaximumFinder implements ExtendedPlugInFilter, DialogListener {
 					max = val;
 			}
 		}
-		if (includeEdge) {
+		if (edgeMode == INCLUDE_EDGE) {
 			if (maxCount > 0 && maxPositions[maxCount - 1] != lastMaxPos)
 				maxPositions[maxCount++] = lastMaxPos;
 			if (maxCount == 0 && max - min >= tolerance)
@@ -325,20 +338,42 @@ public class MaximumFinder implements ExtendedPlugInFilter, DialogListener {
 			int pos = maxPositions[rankPositions[jj]];
 			returnArr[maxCount - jj - 1] = pos;//use descending order
 		}
+		if(edgeMode == CIRCULAR){
+		    int count = 0;
+		    for(int jj = 0; jj < returnArr.length;jj++){
+			int pos = returnArr[jj] - origLen;
+			if(pos >= 0 && pos < origLen )//pick maxima from cascade center part
+			    returnArr[count++] = pos;
+		    }
+		    int[] returrn2Arr = new int[count];
+		    System.arraycopy(returnArr, 0, returrn2Arr, 0, count);
+		    returnArr = returrn2Arr;
+		    
+		}
 		return returnArr;
 	}
 	
+	public static int[] findMaxima(double[] xx, double tolerance, boolean excludeOnEdges) {
+	    int edgeBehavior = (excludeOnEdges) ? 1 : 0;
+	    return findMaxima(xx, tolerance, edgeBehavior);
+	}
+	 
 	/**
 	* Returns minimum positions of array xx, sorted with decreasing strength
 	*/
-	public static int[] findMinima(double[] xx, double tolerance, boolean includeEdges) {
+	public static int[] findMinima(double[] xx, double tolerance, boolean excludeEdges ) {
+	    int edgeMode = (excludeEdges) ? 1 : 0;	
+	    return findMinima(xx, tolerance, edgeMode);
+	}
+		
+	public static int[] findMinima(double[] xx, double tolerance, int edgeMode) {
 		int len = xx.length;
 		double[] negArr = new double[len];
 		for (int jj = 0; jj < len; jj++)
 			negArr[jj] = -xx[jj];
-		int[] minPositions = findMaxima(negArr, tolerance, includeEdges);
+		int[] minPositions = findMaxima(negArr, tolerance, edgeMode);
 		return minPositions;
-	}
+	}	
 	
      /** Find the maxima of an image.
      * @param ip             The input image
@@ -572,10 +607,10 @@ public class MaximumFinder implements ExtendedPlugInFilter, DialogListener {
                     for (int d=0; d<8; d++) {       //analyze all neighbors (in 8 directions) at the same level
                         int offset2 = offset+dirOffset[d];
                         if ((isInner || isWithin(x, y, d)) && (types[offset2]&LISTED)==0) {
-                        if (isEDM && edmPixels[offset2]<=0) continue;   //ignore the background (non-particles)
+                            if (isEDM && edmPixels[offset2]<=0)
+                                continue;   //ignore the background (non-particles)
                             if ((types[offset2]&PROCESSED)!=0) {
                                 maxPossible = false; //we have reached a point processed previously, thus it is no maximum now
-                                //if(x0<25&&y0<20)IJ.write("x0,y0="+x0+","+y0+":stop at processed neighbor from x,y="+x+","+y+", dir="+d);
                                 break;
                             }
                             int x2 = x+DIR_X_OFFSET[d];
@@ -684,6 +719,8 @@ public class MaximumFinder implements ExtendedPlugInFilter, DialogListener {
                 rt.show("Results");
             } else if (outputType==COUNT) {
                 ResultsTable rt = ResultsTable.getResultsTable();
+                if (!IJ.isResultsWindow())
+                	rt = new ResultsTable();
                 rt.incrementCounter();
                 rt.setValue("Count", rt.getCounter()-1, npoints);
                 int measurements = Analyzer.getMeasurements();

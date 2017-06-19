@@ -14,12 +14,19 @@ public class Converter implements PlugIn {
 	public void run(String arg) {
 		imp = WindowManager.getCurrentImage();
 		if (imp!=null) {
-			if (imp.isComposite() && arg.equals("RGB Color") && !imp.getStack().isRGB() && !imp.getStack().isHSB() && !imp.getStack().isLab())
-				(new RGBStackConverter()).run("");
-			else if (imp.lock()) {
+			if (imp.isComposite() && arg.equals("RGB Color") && !imp.getStack().isRGB() && !imp.getStack().isHSB() && !imp.getStack().isLab()) {
+				if (imp.getWindow()==null && !ij.macro.Interpreter.isBatchMode())
+					RGBStackConverter.convertToRGB(imp);
+				else {
+					(new RGBStackConverter()).run("");
+					imp.setTitle(imp.getTitle()); // updates size in Window menu
+				}
+			} else if (imp.lock()) {
 				convert(arg);
 				imp.unlock();
-			}
+				imp.setTitle(imp.getTitle());
+			} else 
+				IJ.log("<<Converter: image is locked ("+imp+")>>");
 		} else
 			IJ.noImage();
 	}
@@ -37,7 +44,7 @@ public class Converter implements PlugIn {
 	 	long start = System.currentTimeMillis();
 	 	Roi roi = imp.getRoi();
 	 	imp.deleteRoi();
-	 	if (imp.getProcessor().getMinThreshold()!=ImageProcessor.NO_THRESHOLD)
+	 	if (imp.isThreshold())
 			imp.getProcessor().resetThreshold();
 	 	boolean saveChanges = imp.changes;
 		imp.changes = IJ.getApplet()==null; //if not applet, set 'changes' flag

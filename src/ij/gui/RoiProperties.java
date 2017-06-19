@@ -13,16 +13,18 @@ import java.util.*;
 
  /** Displays a dialog that allows the user to specify ROI properties such as color and line width. */
 public class RoiProperties {
+	private ImagePlus imp;
 	private Roi roi;
+	private Overlay overlay;
 	private String title;
 	private boolean showName = true;
 	private boolean showListCoordinates;
 	private boolean addToOverlay;
 	private boolean overlayOptions;
-	private boolean existingOverlay;
 	private boolean setPositions;
 	private boolean listCoordinates;
 	private boolean listProperties;
+	private boolean showPointCounts;
 	private static final String[] justNames = {"Left", "Center", "Right"};
 	private int nProperties;
 
@@ -36,12 +38,10 @@ public class RoiProperties {
 		nProperties = showListCoordinates?roi.getPropertyCount():0;
 		addToOverlay = title.equals("Add to Overlay");
 		overlayOptions = title.equals("Overlay Options");
-		ImagePlus imp = WindowManager.getCurrentImage();
 		if (overlayOptions) {
-			Overlay overlay = imp!=null?imp.getOverlay():null;
+			imp = WindowManager.getCurrentImage();
+			overlay = imp!=null?imp.getOverlay():null;
 			setPositions = roi.getPosition()!=0;
-			if (overlay!=null)
-				existingOverlay = true;
 		}
 		this.roi = roi;
 	}
@@ -84,11 +84,8 @@ public class RoiProperties {
 			antialias = troi.getAntialiased();
 		}
 		String position = ""+roi.getPosition();
-		int cpos = roi.getCPosition();
-		int zpos = roi.getZPosition();
-		int tpos = roi.getTPosition();
-		if (cpos>0 || zpos>0 || tpos>0)
-			position = cpos +","+zpos+","+tpos;
+		if (roi.hasHyperStackPosition())
+			position =  roi.getCPosition() +","+roi.getZPosition()+","+ roi.getTPosition();
 		if (position.equals("0"))
 			position = "none";
 		String linec = Colors.colorToString(strokeColor);
@@ -132,16 +129,33 @@ public class RoiProperties {
 		if (addToOverlay)
 			gd.addCheckbox("New overlay", false);
 		if (overlayOptions) {
-			if (existingOverlay) {
-				gd.addCheckbox("Apply to current overlay", false);
-			}
 			gd.addCheckbox("Set stack positions", setPositions);
+			if (overlay!=null) {
+				int size = overlay.size();
+				gd.setInsets(15,20,0);
+				if (imp!=null && imp.getHideOverlay())
+					gd.addMessage("Current overlay is hidden", null, Color.darkGray);
+				else
+					gd.addMessage("Current overlay has "+size+" element"+(size>1?"s":""), null, Color.darkGray);
+				gd.setInsets(0,30,0);
+				gd.addCheckbox("Apply", false);
+				gd.setInsets(0,30,0);
+				gd.addCheckbox("Show labels", overlay.getDrawLabels());
+				gd.setInsets(0,30,0);
+				gd.addCheckbox("Hide", imp!=null?imp.getHideOverlay():false);
+			} else
+				gd.addMessage("No overlay", null, Color.darkGray);
 		}
 		if (isText)
 			gd.addCheckbox("Antialiased text", antialias);
 		if (showListCoordinates) {
+			if ((roi instanceof PointRoi) && Toolbar.getMultiPointMode())
+				showPointCounts = true;
 			int n = roi.getFloatPolygon().npoints;
-			gd.addCheckbox("List coordinates ("+n+")", listCoordinates);
+			if (showPointCounts)
+				gd.addCheckbox("Show point counts (shortcut: alt+y)", listCoordinates);
+			else
+				gd.addCheckbox("List coordinates ("+n+")", listCoordinates);
 			if (nProperties>0)
 				gd.addCheckbox("List properties ("+nProperties+")", listProperties);
 			else {
@@ -179,9 +193,24 @@ public class RoiProperties {
 		boolean applyToOverlay = false;
 		boolean newOverlay = addToOverlay?gd.getNextBoolean():false;
 		if (overlayOptions) {
-			if (existingOverlay)
-				applyToOverlay = gd.getNextBoolean();
 			setPositions = gd.getNextBoolean();
+			if (overlay!=null) {
+				applyToOverlay = gd.getNextBoolean();
+				boolean labels = gd.getNextBoolean();
+				boolean hideOverlay = gd.getNextBoolean();
+				if (hideOverlay && imp!=null) {
+					if (!imp.getHideOverlay())
+						imp.setHideOverlay(true);
+				} else {
+					overlay.drawLabels(labels);
+					Analyzer.drawLabels(labels);
+					overlay.drawBackgrounds(true);
+					if (imp.getHideOverlay())
+						imp.setHideOverlay(false);
+					if (!applyToOverlay && imp!=null)
+						imp.draw();
+				}
+			}
 			roi.setPosition(setPositions?1:0);
 		}
 		if (isText)
@@ -212,11 +241,7 @@ public class RoiProperties {
 		roi.setFillColor(fillColor);
 		if (newOverlay) roi.setName("new-overlay");
 		if (applyToOverlay) {
-			ImagePlus imp = WindowManager.getCurrentImage();
-			if (imp==null)
-				return true;
-			Overlay overlay = imp.getOverlay();
-			if (overlay==null)
+			if (imp==null || overlay==null)
 				return true;
 			Roi[] rois = overlay.toArray();
 			for (int i=0; i<rois.length; i++) {
@@ -225,9 +250,14 @@ public class RoiProperties {
 				rois[i].setFillColor(fillColor);
 			}
 			imp.draw();
+			imp.getProcessor(); // needed for corect recordering
 		}
-		if (listCoordinates)
-			listCoordinates(roi);
+		if (listCoordinates) {
+			if (showPointCounts && (roi instanceof PointRoi))
+				((PointRoi)roi).displayCounts();
+			else
+				listCoordinates(roi);
+		}
 		if (listProperties && nProperties>0)
 			listProperties(roi);
 		return true;

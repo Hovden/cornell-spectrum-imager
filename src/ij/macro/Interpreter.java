@@ -60,6 +60,9 @@ public class Interpreter implements MacroConstants {
 	boolean inLoop;
 	int loopDepth;
 	static boolean tempShowMode;
+	boolean waitingForUser;
+	int selectCount;
+
 	
 	static TextWindow arrayWindow;
 	int inspectStkIndex = -1;
@@ -612,7 +615,7 @@ public class Interpreter implements MacroConstants {
 		getToken();
 		switch (token) {
 			case PREDEFINED_FUNCTION: case USER_FUNCTION: case VAR:
-			case WORD: case '(': case PLUS_PLUS: case RETURN:
+			case WORD: case '(': case PLUS_PLUS: case RETURN: case ARRAY_FUNCTION:
 			case NUMERIC_FUNCTION: case STRING_FUNCTION:
 				skipSimpleStatement();
 				break;
@@ -1176,7 +1179,7 @@ public class Interpreter implements MacroConstants {
 		WindowManager.setTempCurrentImage(null);
 		wasError = true;
 		instance = null;
-		if (showMessage) {
+		if (showMessage && message!=null) {
 			String line = getErrorLine();
 			done = true;
 			if (line.length()>120)
@@ -1738,6 +1741,11 @@ public class Interpreter implements MacroConstants {
 			if (rt!=null && rt.size()>0)
 				rt.show("Results");
 		}
+		if (IJ.isMacOSX() && selectCount>0 && debugger==null) {
+			Frame frame = WindowManager.getFrontWindow();
+			if (frame!=null && (frame instanceof ImageWindow))
+				ImageWindow.setImageJMenuBar((ImageWindow)frame);
+		}
 	}
 	
 	/** Aborts currently running macro. */
@@ -1862,7 +1870,7 @@ public class Interpreter implements MacroConstants {
 	/** Returns the batch mode RoiManager instance. */
 	public static RoiManager getBatchModeRoiManager() {
 		Interpreter interp = getInstance();
-		if (interp!=null && isBatchMode() && RoiManager.getInstance()==null) {
+		if (interp!=null && isBatchMode() && RoiManager.getRawInstance()==null) {
 			if (interp.func.roiManager==null)
 				interp.func.roiManager = new RoiManager(true);
 			return interp.func.roiManager;
@@ -2080,6 +2088,19 @@ public class Interpreter implements MacroConstants {
 	
 	static void setTempShowMode(boolean mode) {
 		tempShowMode = mode;
+	}
+	
+	private static Interpreter lastInterp;
+	
+	public static boolean nonBatchMacroRunning() {
+		Interpreter interp = getInstance();
+		if (interp==null)
+			return false;
+		int count =  interp.selectCount;
+		if (interp==lastInterp)
+			interp.selectCount++;
+		lastInterp = interp;
+		return !interp.waitingForUser && interp.debugger==null && count>0 && !isBatchMode();
 	}
 
 } // class Interpreter

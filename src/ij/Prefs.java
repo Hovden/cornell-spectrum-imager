@@ -54,7 +54,8 @@ public class Prefs {
 
 	private static final int USE_SYSTEM_PROXIES=1<<0, USE_FILE_CHOOSER=1<<1,
 		SUBPIXEL_RESOLUTION=1<<2, ENHANCED_LINE_TOOL=1<<3, SKIP_RAW_DIALOG=1<<4,
-		REVERSE_NEXT_PREVIOUS_ORDER=1<<5;
+		REVERSE_NEXT_PREVIOUS_ORDER=1<<5, AUTO_RUN_EXAMPLES=1<<6, SHOW_ALL_POINTS=1<<7,
+		DO_NOT_SAVE_WINDOW_LOCS=1<<8, JFILE_CHOOSER_CHANGED=1<<9;
 	public static final String OPTIONS2 = "prefs.options2";
     
 	/** file.separator system property */
@@ -83,7 +84,7 @@ public class Prefs {
 	public static boolean requireControlKey;
 	/** Open 8-bit images with inverting LUT so 0 is white and 255 is black. */
 	public static boolean useInvertingLut;
-	/** Draw tool icons using antialiasing. */
+	/** Draw tool icons using antialiasing (always true). */
 	public static boolean antialiasedTools = true;
 	/** Export TIFF and Raw using little-endian byte order. */
 	public static boolean intelByteOrder;
@@ -153,6 +154,23 @@ public class Prefs {
 	public static boolean skipRawDialog;
 	/** Reverse channel-slice-frame priority used by Next Slice and Previous Slice commands. */
 	public static boolean reverseNextPreviousOrder;
+	/** Automatically run examples in Help/Examples menu. */
+	public static boolean autoRunExamples = true;
+	/** Ignore stack positions when displaying points. */
+	public static boolean showAllPoints;
+	/** Set MenuBar on Macs running Java 8. */
+	public static boolean setIJMenuBar = IJ.isMacOSX();
+	/** "ImageJ" window is always on top. */
+	public static boolean alwaysOnTop;
+	/** Automatically spline fit line selections */
+	public static boolean splineFitLines;
+	/** Enable this option to workaround a bug with some Linux window
+		managers that causes windows to wander down the screen. */
+	public static boolean doNotSaveWindowLocations = true;
+	/** Use JFileChooser setting changed/ */
+	public static boolean jFileChooserSettingChanged;
+
+	
 
 	static Properties ijPrefs = new Properties();
 	static Properties props = new Properties(ijPrefs);
@@ -173,12 +191,6 @@ public class Prefs {
 			return loadAppletProps(f, applet);
 		if (homeDir==null)
 			homeDir = System.getProperty("user.dir");
-		String userHome = System.getProperty("user.home");
-		prefsDir = userHome; // User's home directory
-		if (IJ.isMacOSX())
-			prefsDir += "/Library/Preferences";
-		else
-			prefsDir += File.separator+".imagej";
 		if (f==null) {
 			try {f = new FileInputStream(homeDir+"/"+PROPS_NAME);}
 			catch (FileNotFoundException e) {f=null;}
@@ -247,9 +259,17 @@ public class Prefs {
 			return path;
 	}
 
-	/** Gets the path to the directory where the 
+	/** Returns the path to the directory where the 
 		preferences file (IJPrefs.txt) is saved. */
 	public static String getPrefsDir() {
+		if (prefsDir==null) {
+			String dir = System.getProperty("user.home");
+			if (IJ.isMacOSX())
+				dir += "/Library/Preferences";
+			else
+				dir += File.separator+".imagej";
+			prefsDir = dir;
+		}
 		return prefsDir;
 	}
 
@@ -337,7 +357,7 @@ public class Prefs {
 
 	/** Opens the IJ_Prefs.txt file. */
 	static void loadPreferences() {
-		String path = prefsDir+separator+PREFS_NAME;
+		String path = getPrefsDir()+separator+PREFS_NAME;
 		boolean ok =  loadPrefs(path);
 		if (!ok) { // not found
 			if (IJ.isWindows())
@@ -389,13 +409,17 @@ public class Prefs {
 			ImportDialog.savePreferences(prefs);
 			PlotWindow.savePreferences(prefs);
 			NewImage.savePreferences(prefs);
+			String prefsDir = getPrefsDir();
 			path = prefsDir+separator+PREFS_NAME;
 			if (prefsDir.endsWith(".imagej")) {
 				File f = new File(prefsDir);
 				if (!f.exists()) f.mkdir(); // create .imagej directory
 			}
 			if (resetPreferences) {
-				new File(path).delete();
+				File f = new File(path);
+				if (!f.exists())
+					IJ.error("Edit>Options>Reset", "Unable to reset preferences. File not found at\n"+path);
+				boolean rtn = f.delete();
 				resetPreferences = false;
 			} else
 				savePrefs(prefs, path);
@@ -416,7 +440,7 @@ public class Prefs {
 	}
 
 	static void loadOptions() {
-		int defaultOptions = ANTIALIASING+AVOID_RESLICE_INTERPOLATION+ANTIALIASED_TOOLS
+		int defaultOptions = ANTIALIASING+AVOID_RESLICE_INTERPOLATION+ANTIALIASED_TOOLS+MULTI_POINT_MODE
 			+(!IJ.isMacOSX()?RUN_SOCKET_LISTENER:0);
 		int options = getInt(OPTIONS, defaultOptions);
 		usePointerCursor = (options&USE_POINTER)!=0;
@@ -457,6 +481,10 @@ public class Prefs {
 		enhancedLineTool = (options2&ENHANCED_LINE_TOOL)!=0;
 		skipRawDialog = (options2&SKIP_RAW_DIALOG)!=0;
 		reverseNextPreviousOrder = (options2&REVERSE_NEXT_PREVIOUS_ORDER)!=0;
+		autoRunExamples = (options2&AUTO_RUN_EXAMPLES)!=0;
+		showAllPoints = (options2&SHOW_ALL_POINTS)!=0;
+		doNotSaveWindowLocations = (options2&DO_NOT_SAVE_WINDOW_LOCS)!=0;
+		jFileChooserSettingChanged = (options2&JFILE_CHOOSER_CHANGED)!=0;
 	}
 
 	static void saveOptions(Properties prefs) {
@@ -481,7 +509,10 @@ public class Prefs {
 		int options2 = (useSystemProxies?USE_SYSTEM_PROXIES:0)
 			+ (useFileChooser?USE_FILE_CHOOSER:0) + (subPixelResolution?SUBPIXEL_RESOLUTION:0)
 			+ (enhancedLineTool?ENHANCED_LINE_TOOL:0) + (skipRawDialog?SKIP_RAW_DIALOG:0)
-			+ (reverseNextPreviousOrder?REVERSE_NEXT_PREVIOUS_ORDER:0);
+			+ (reverseNextPreviousOrder?REVERSE_NEXT_PREVIOUS_ORDER:0)
+			+ (autoRunExamples?AUTO_RUN_EXAMPLES:0) + (showAllPoints?SHOW_ALL_POINTS:0)
+			+ (doNotSaveWindowLocations?DO_NOT_SAVE_WINDOW_LOCS:0)
+			+ (jFileChooserSettingChanged?JFILE_CHOOSER_CHANGED:0);
 		prefs.put(OPTIONS2, Integer.toString(options2));
 	}
 
@@ -558,7 +589,8 @@ public class Prefs {
 	/** Saves the Point <code>loc</code> in the preferences
 		 file as a string using the keyword <code>key</code>. */
 	public static void saveLocation(String key, Point loc) {
-		set(key, loc.x+","+loc.y);
+		if (!doNotSaveWindowLocations)
+			set(key, loc.x+","+loc.y);
 	}
 
 	/** Uses the keyword <code>key</code> to retrieve a location
@@ -635,7 +667,7 @@ public class Prefs {
 	}
 	
 	public static String defaultResultsExtension() {
-		return get("options.ext", ".xls");
+		return get("options.ext", ".csv");
 	}
 		
 }

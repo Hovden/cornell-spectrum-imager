@@ -195,9 +195,9 @@ public class ZProjector implements PlugIn {
         	ImageProcessor g = green2.getProcessor();
         	ImageProcessor b = blue2.getProcessor();
         	double max = 0;
-        	double rmax = r.getStatistics().max; if (rmax>max) max=rmax;
-        	double gmax = g.getStatistics().max; if (gmax>max) max=gmax;
-        	double bmax = b.getStatistics().max; if (bmax>max) max=bmax;
+        	double rmax = r.getStats().max; if (rmax>max) max=rmax;
+        	double gmax = g.getStats().max; if (gmax>max) max=gmax;
+        	double bmax = b.getStats().max; if (bmax>max) max=bmax;
         	double scale = 255/max;
         	r.multiply(scale); g.multiply(scale); b.multiply(scale);
         	red2.setProcessor(r.convertToByte(false));
@@ -214,7 +214,7 @@ public class ZProjector implements PlugIn {
 	@param start starting slice to display
 	@param stop last slice */
     protected GenericDialog buildControlDialog(int start, int stop) {
-		GenericDialog gd = new GenericDialog("ZProjection",IJ.getInstance()); 
+		GenericDialog gd = new GenericDialog("ZProjection"); 
 		gd.addNumericField("Start slice:",startSlice,0/*digits*/); 
 		gd.addNumericField("Stop slice:",stopSlice,0/*digits*/);
 		gd.addChoice("Projection type", METHODS, METHODS[method]); 
@@ -379,7 +379,7 @@ public class ZProjector implements PlugIn {
         int c, z, t;
 		for (Roi r : overlay.toArray()) {
 			c = r.getCPosition();
-			z = r.getZPosition();
+			z = r.hasHyperStackPosition()?r.getZPosition():0;
 			t = r.getTPosition();
 			roi = (Roi)r.clone();
 			if (z>=startSlice && z<=stopSlice || z==0 || c==0 || t==0) {

@@ -16,7 +16,7 @@ public class PlugInDialog extends Dialog implements PlugIn, WindowListener, Focu
 		ImageJ ij = IJ.getInstance();
 		if (IJ.isMacOSX() && ij!=null) {
 			ij.toFront(); // needed for keyboard shortcuts to work
-			ij.setMenuBar(Menus.getMenuBar());
+			IJ.wait(250);
 		}
 		addWindowListener(this);
  		addFocusListener(this);
@@ -46,17 +46,14 @@ public class PlugInDialog extends Dialog implements PlugIn, WindowListener, Focu
 		WindowManager.removeWindow(this);
     }
 
-    public void windowActivated(WindowEvent e) {
+	public void windowActivated(WindowEvent e) {
 		ImageJ ij = IJ.getInstance();
-		if (IJ.isMacOSX() && ij!=null) {
-			IJ.wait(10); // may be needed for Java 1.4 on OS X
-			ij.setMenuBar(Menus.getMenuBar());
-		}
+		if (IJ.isMacOSX() && ij!=null && !ij.isActive() && !(this instanceof ThresholdAdjuster))
+			ij.toFront();
 		WindowManager.setWindow(this);
 	}
 
 	public void focusGained(FocusEvent e) {
-		//IJ.log("PlugInFrame: focusGained");
 		WindowManager.setWindow(this);
 	}
 

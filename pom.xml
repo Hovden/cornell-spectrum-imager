@@ -3,7 +3,7 @@
 	<modelVersion>4.0.0</modelVersion>
 	<groupId>org.csi</groupId>
 	<artifactId>csi</artifactId>
-	<version>1.0.0</version>
+	<version>1.7.0</version>
 	<name>Cornell Spectrum Imager</name>
 	<build>
 		<sourceDirectory>src</sourceDirectory>
@@ -16,6 +16,8 @@
 					<include>IJ_Props.txt</include>
 					<include>macros/*.txt</include>
 					<include>macros/*.ijm</include>
+					<include>macros/toolsets/CSI.txt</include>
+					<include>macros/toolsets/CSI4D.txt</include>
 					<include>images/CSI_prism.gif</include>
 				</includes>
 			</resource>
@@ -63,8 +65,8 @@
 						</goals>
 						<configuration>
 							<headerType>console</headerType>
-							<outfile>target/csi.exe</outfile>
-							<jar>target/csi-1.0.0.jar</jar>
+							<outfile>target/csi-v170.exe</outfile>
+							<jar>target/csi-v170.jar</jar>
 							<errTitle>csi</errTitle>
 							<classPath>
 								<mainClass>ij.ImageJ</mainClass>
@@ -72,7 +74,7 @@
 								<preCp>anything</preCp>
 							</classPath>
 							<jre>
-								<minVersion>1.5.0</minVersion>
+								<minVersion>1.7.0</minVersion>
 								<opts>
 									<opt>-Djava.endorsed.dirs=./endorsed</opt>
 								</opts>
@@ -119,7 +121,7 @@
 		<dependency>
 			<groupId>gov.nist.math</groupId>
 			<artifactId>jama</artifactId>
-			<version>1.0.2</version>
+			<version>1.0.3</version>
 		</dependency>
 	</dependencies>
 </project>

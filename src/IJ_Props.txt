@@ -361,7 +361,8 @@ plug-in08="CSI Map to Line",plugins.CSI.CSI_Map_to_Line
 plug-in09="CSI Darkref Subtractor",plugins.CSI.CSI_Darkref_Subtractor
 plug-in10="CSI TIA Reader",plugins.CSI.CSI_TIA_Reader
 plug-in11="CSI Spectrum Analyzer",plugins.CSI.CSI_Spectrum_Analyzer
-plug-in12="CSI Dynamic Profiler",plugins.CSI.Dynamic_Profiler
+plug-in12="CSI Dynamic Profiler",plugins.CSI.CSI_Dynamic_Profiler
+plug-in13="CSI PAD Analyzer",plugins.CSI.CSI_PAD_Analyzer
 #plug-in09=>"User_Plugins"
 
 # Install user plugins located in ij.jar to Plugins>User Plugins submenu
@@ -377,6 +378,7 @@ macros03="Edit...",ij.plugin.Compiler("edit")
 macros04="Startup Macros...",ij.plugin.Commands("startup")
 macros05="Record...",ij.plugin.frame.Recorder
 macros06=-
+
 
 # Plugins installed in the Plugins/Shortcuts submenu
 shortcuts01="List Shortcuts...",ij.plugin.CommandLister("shortcuts")

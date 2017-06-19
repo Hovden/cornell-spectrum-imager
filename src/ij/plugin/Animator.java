@@ -82,16 +82,17 @@ public class Animator implements PlugIn {
 	void stopAnimation() {
 		swin.setAnimate(false);
 		IJ.wait(500+(int)(1000.0/animationRate));
-		imp.unlock(); 
 	}
 
 	void startAnimation() {
+		if (imp.isLocked()) {
+			return;
+		}
 		int first=firstFrame, last=lastFrame;
 		if (first<1 || first>nSlices || last<1 || last>nSlices)
 			{first=1; last=nSlices;}
 		if (swin.getAnimate())
 			{stopAnimation(); return;}
-		imp.unlock(); // so users can adjust brightness/contrast/threshold
 		swin.setAnimate(true);
 		long time, nextTime=System.currentTimeMillis();
 		Thread.currentThread().setPriority(Thread.MIN_PRIORITY);
@@ -99,8 +100,10 @@ public class Animator implements PlugIn {
 		Calibration cal = imp.getCalibration();
 		if (cal.fps!=0.0)
 			animationRate = cal.fps;
-		if (animationRate<0.1)
+		if (animationRate<0.1) {
 			animationRate = 1.0;
+			cal.fps = animationRate;
+		}
 		int frames = imp.getNFrames();
 		int slices = imp.getNSlices();
 		
@@ -253,8 +256,6 @@ public class Animator implements PlugIn {
 	}
 	
 	void nextSlice() {
-		if (!imp.lock())
-			return;
 		boolean hyperstack = imp.isDisplayedHyperStack();
 		int channels = imp.getNChannels();
 		int slices = imp.getNSlices();
@@ -281,12 +282,9 @@ public class Animator implements PlugIn {
 			swin.showSlice(slice);
 		}
 		imp.updateStatusbarValue();
-		imp.unlock();
 	}	
 	
 	void previousSlice() {
-		if (!imp.lock())
-			return;
 		boolean hyperstack = imp.isDisplayedHyperStack();
 		int channels = imp.getNChannels();
 		int slices = imp.getNSlices();
@@ -313,12 +311,9 @@ public class Animator implements PlugIn {
 			swin.showSlice(slice);
 		}
 		imp.updateStatusbarValue();
-		imp.unlock();
 	}
 
 	void changeSlice(int pn) {
-		if (!imp.lock())
-			return;
 		boolean hyperstack = imp.isDisplayedHyperStack();
 		int channels = imp.getNChannels();
 		int slices = imp.getNSlices();
@@ -353,7 +348,6 @@ public class Animator implements PlugIn {
 			swin.showSlice(slice);
 		}
 		imp.updateStatusbarValue();
-		imp.unlock();
 	}
 
 	void setSlice() {

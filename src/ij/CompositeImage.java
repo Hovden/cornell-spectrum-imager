@@ -210,7 +210,7 @@ public class CompositeImage extends ImagePlus {
 				setupLuts(nChannels);
 				LUT cm = lut[currentChannel];
 				if (mode==COLOR)
-					ip.setColorModel(cm);
+					ip.setLut(cm);
 				if (!(cm.min==0.0&&cm.max==0.0))
 					ip.setMinAndMax(cm.min, cm.max);
 				if (!IJ.isMacro()) ContrastAdjuster.update();
@@ -620,6 +620,32 @@ public class CompositeImage extends ImagePlus {
 		return customLuts && mode!=GRAYSCALE;
 	}
 	
+	public void close() {
+		super.close();
+		rgbPixels = null;
+		imageSource = null;
+		awtImage = null;
+		rgbRaster = null;
+		rgbSampleModel = null;
+		rgbImage = null;
+		rgbCM = null;
+		if (cip!=null) {
+			for (int i=0; i<cip.length; i++)
+				cip[i] = null;
+			cip = null;
+		}
+		if (lut!=null) {
+			for (int i=0; i<lut.length; i++)
+				lut[i] = null;
+			lut = null;
+		}
+		if (channelLuts!=null) {
+			for (int i=0; i<channelLuts.length; i++)
+				channelLuts[i] = null;
+			channelLuts = null;
+		}
+	}
+
 	/** Deprecated */
 	public synchronized void setChannelsUpdated() {
 		if (cip!=null) {

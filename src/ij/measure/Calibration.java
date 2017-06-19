@@ -82,7 +82,8 @@ public class Calibration implements Cloneable {
 	public Calibration(ImagePlus imp) {
 		if (imp!=null) {
 			bitDepth = imp.getBitDepth();
-			invertedLut = imp.isInvertedLut();
+			if (bitDepth!=UNKNOWN)
+				invertedLut=imp.isInvertedLut();
 		}
 	}
 	
@@ -109,12 +110,18 @@ public class Calibration implements Cloneable {
 
    	/** Sets the Y length unit. */
  	public void setYUnit(String unit) {
-		yunit = sanitizeUnit(unit);
+ 		if (unit==null || unit.equals(""))
+ 			yunit = null;
+ 		else
+			yunit = sanitizeUnit(unit);
 	}
 
    	/** Sets the Z length unit. */
  	public void setZUnit(String unit) {
-		zunit = sanitizeUnit(unit );
+ 		if (unit==null || unit.equals(""))
+ 			zunit = null;
+ 		else
+			zunit = sanitizeUnit(unit );
 	}
 
 	private static String sanitizeUnit(String unit) {
@@ -249,7 +256,7 @@ public class Calibration implements Cloneable {
  		if (imp==null)
  			return;
  		int type = imp.getType();
- 		int newBitDepth = imp.getBitDepth();
+		int newBitDepth = imp.getBitDepth();
  		if (newBitDepth==16 && imp.getLocalCalibration().isSigned16Bit()) {
 			double[] coeff = new double[2]; coeff[0] = -32768.0; coeff[1] = 1.0;
  			setFunction(Calibration.STRAIGHT_LINE, coeff, DEFAULT_VALUE_UNIT);
@@ -494,7 +501,8 @@ public class Calibration implements Cloneable {
 			+ ", f=" + function
  			+ ", nc=" + (coefficients!=null?""+coefficients.length:"null")
  			+ ", table=" + (cTable!=null?""+cTable.length:"null")
-			+ ", vunit=" + valueUnit;
+			+ ", vunit=" + valueUnit
+			+ ", bd=" + bitDepth;
    }
 }
 

@@ -14,9 +14,8 @@ import java.awt.image.*;
 import java.io.*;
 import java.net.URL;
 import java.net.*;
-import java.util.Hashtable;
+import java.util.*;
 import java.util.zip.*;
-import java.util.Locale;
 import javax.swing.*;
 import javax.swing.filechooser.*;
 import java.awt.event.KeyEvent;
@@ -92,7 +91,7 @@ public class Opener {
 				(new PluginInstaller()).install(path);
 				return;
 		}
-		boolean fullPath = path.startsWith("/") || path.startsWith("\\") || path.indexOf(":\\")==1 || isURL;
+		boolean fullPath = path.startsWith("/") || path.startsWith("\\") || path.indexOf(":\\")==1 || path.indexOf(":/")==1 || isURL;
 		if (!fullPath) {
 			String defaultDir = OpenDialog.getDefaultDirectory();
 			if (defaultDir!=null)
@@ -103,7 +102,11 @@ public class Opener {
 		if (!silentMode)
 			IJ.showStatus("Opening: " + path);
 		long start = System.currentTimeMillis();
-		ImagePlus imp = openImage(path);
+		ImagePlus imp = null;
+		if (path.endsWith(".txt"))
+			fileType = JAVA_OR_TEXT;
+		else
+			imp = openImage(path);
 		if (imp==null && isURL)
 			return;
 		if (imp!=null) {
@@ -354,6 +357,11 @@ public class Opener {
 				reader.displayDialog(!IJ.macroRunning());
 				reader.run(path);
 				return reader.getImagePlus();
+			case JAVA_OR_TEXT:
+				if (name.endsWith(".txt"))
+					return openTextImage(directory,name);
+				else
+					return null;
 			case UNKNOWN: case TEXT:
 				// Call HandleExtraFileTypes plugin to see if it can handle unknown format
 				int[] wrap = new int[] {fileType};
@@ -379,6 +387,14 @@ public class Opener {
 			return dir+name;
 	}
 
+	/** Opens the specified text file as a float image. */
+	public ImagePlus openTextImage(String dir, String name) {
+		String path = dir+name;
+		TextReader tr = new TextReader();
+		ImageProcessor ip = tr.open(path);
+		return ip!=null?new ImagePlus(name,ip):null;
+	}
+
 	/**
 	 * Attempts to open the specified url as a tiff, zip compressed tiff, 
 	 * dicom, gif or jpeg. Tiff file names must end in ".tif", ZIP file names 
@@ -387,6 +403,8 @@ public class Opener {
 	 * @see ij.IJ#openImage(String)
 	*/
 	public ImagePlus openURL(String url) {
+		url = updateUrl(url);
+		if (IJ.debugMode) IJ.log("OpenURL: "+url);
 		ImagePlus imp = openCachedImage(url);
 		if (imp!=null)
 			return imp;
@@ -437,8 +455,18 @@ public class Opener {
 		} 
 	}
 	
+	/** Can't open imagej.nih.gov URLs due to encryption so redirect to mirror.nih.net. */
+	public static String updateUrl(String url) {
+		if (url==null || !url.contains("nih.gov"))
+			return url;
+		url = url.replace("imagej.nih.gov/ij", "mirror.imagej.net");
+		url = url.replace("rsb.info.nih.gov/ij", "mirror.imagej.net");
+		url = url.replace("rsbweb.nih.gov/ij", "mirror.imagej.net");
+		return url;
+	}
+	
 	private ImagePlus openCachedImage(String url) {
-		if (url==null || !url.contains("ij/images"))
+		if (url==null || !url.contains("/images"))
 			return null;
 		String ijDir = IJ.getDirectory("imagej");
 		if (ijDir==null)
@@ -584,12 +612,17 @@ public class Opener {
 	}
 
 	ImagePlus openPngUsingURL(String title, URL url) {
-		if (url==null) return null;
+		if (url==null)
+			return null;
+		//System.setProperty("jsse.enableSNIExtension","false");
 		Image img = null;
 		try {
-			img = ImageIO.read(url);
+			InputStream in = url.openStream();
+			img = ImageIO.read(in);
+		} catch (FileNotFoundException e) {
+			IJ.error("Open PNG Using URL", ""+e);
 		} catch (IOException e) {
-			IJ.log(""+e);
+			IJ.handleException(e);
 		}
 		if (img!=null) {
 			ImagePlus imp = new ImagePlus(title, img);
@@ -685,7 +718,7 @@ public class Opener {
 			return null;
 		FileInfo fi = info[0];
 		if (fi.nImages>1)
-			return new FileOpener(fi).open(false); // open contiguous images as stack
+			return new FileOpener(fi).openImage(); // open contiguous images as stack
 		else {
 			ColorModel cm = createColorModel(fi);
 			ImageStack stack = new ImageStack(fi.width, fi.height, cm);
@@ -842,7 +875,7 @@ public class Opener {
 			fi.stripLengths = info[n-1].stripLengths; 
 		}
 		FileOpener fo = new FileOpener(fi);
-		return fo.open(false);
+		return fo.openImage();
 	}
 
 	/** Returns the FileInfo of the specified TIFF file. */
@@ -946,7 +979,7 @@ public class Opener {
 			return null;
 		}
 		FileOpener opener = new FileOpener(info[0]);
-		ImagePlus imp = opener.open(false);
+		ImagePlus imp = opener.openImage();
 		if (imp==null)
 			return null;
 		imp.setTitle(info[0].fileName);
@@ -1003,7 +1036,7 @@ public class Opener {
 				return imp;
 		}
 		FileOpener fo = new FileOpener(info[0]);
-		imp = fo.open(false);
+		imp = fo.openImage();
 		if (imp==null) return null;
 		int[] offsets = info[0].stripOffsets;
 		if (offsets!=null&&offsets.length>1 && offsets[offsets.length-1]<offsets[0])
@@ -1205,7 +1238,7 @@ public class Opener {
 			return OJJ;
 
 		// Results table (tab-delimited or comma-separated tabular text)
-		if (name.endsWith(".xls") || name.endsWith(".csv")) 
+		if (name.endsWith(".xls") || name.endsWith(".csv") || name.endsWith(".tsv")) 
 			return TABLE;
 
 		// AVI
@@ -1285,5 +1318,5 @@ public class Opener {
 	public static boolean getOpenUsingPlugins() {
 		return openUsingPlugins;
 	}
-	
+		
 }
