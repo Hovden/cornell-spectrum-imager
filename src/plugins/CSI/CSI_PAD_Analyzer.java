@@ -13,6 +13,7 @@ import java.awt.event.*;
 import java.util.*;
 import java.awt.geom.*;
 import javax.swing.*;
+import javax.swing.event.*;
 
 
 
@@ -50,16 +51,18 @@ import javax.swing.*;
  *   David A. Muller <david.a.muller@cornell.edu>
  *
  * ***** END LICENSE BLOCK ***** */
-public class CSI_PAD_Analyzer implements PlugInFilter, MouseListener, MouseMotionListener, Measurements, KeyListener, ImageListener, ItemListener {
+public class CSI_PAD_Analyzer implements PlugInFilter, MouseListener, MouseMotionListener, Measurements, KeyListener, ImageListener, ItemListener, ChangeListener {
 
     ImagePlus img; //Image data
     int width, height, zsize, tsize;
+    double scale;
     ImagePlus realimage, kimage;
     Roi kroi, rroi;
-    FloatProcessor fpk, fpr;
+    ImageProcessor fpk, fpr;
     ImageCanvas canvasr, canvask;
     int detectorMethod;
     JComboBox<String> comMethod;
+    JSlider sldLogScale;
 
     /*
      * Load image data and start Cornell Diffraction Imager
@@ -81,14 +84,24 @@ public class CSI_PAD_Analyzer implements PlugInFilter, MouseListener, MouseMotio
         Panel drop = new Panel();
         drop.add(comMethod);
 
-        kimage.show();
-        realimage.show();
+        sldLogScale = new JSlider(-10,100,-10);
+        sldLogScale.addChangeListener(this);
+        sldLogScale.setVisible(true);
+        Panel slid = new Panel();
+        slid.add(sldLogScale);
+        scale=0;
 
+        kimage.show();
         canvask = kimage.getCanvas();
+        kimage.getWindow().add(slid);
+        IJ.run("Out [-]");
+        IJ.run("In [+]");
+        realimage.show();
         canvasr = realimage.getCanvas();
         realimage.getWindow().add(drop);
+        IJ.run("Out [-]");
         IJ.run("In [+]");
-        IJ.run("In [+]");
+
         addListeners();
         img.hide();
         return DOES_ALL + NO_CHANGES;
@@ -187,19 +200,20 @@ public class CSI_PAD_Analyzer implements PlugInFilter, MouseListener, MouseMotio
         float[][] f;
 
         if (numpoints==1)
-            kimage.setProcessor(stack.getProcessor(rroi.getContainedPoints()[0].x + zsize*rroi.getContainedPoints()[0].y));
+            fpk = stack.getProcessor(rroi.getContainedPoints()[0].x + zsize*rroi.getContainedPoints()[0].y).duplicate();
         else {
                 for (Point p : rroi) {
                     f=stack.getProcessor(p.x + zsize*p.y).getFloatArray();
                     for (int i = 0; i<f.length; i++)
                         for (int j = 0; j<f[i].length; j++)
-                            values[i][j]+=f[i][j]/numpoints;
+                            values[i][j]+=scale*f[i][j]/numpoints;
                 }
             fpk = new FloatProcessor(values);
-
-            fpk.resetMinAndMax();
-            kimage.setProcessor(fpk);
-        }  
+        }
+        if (scale!=0)
+            fpk.applyMacro("v=log(1+"+Double.toString(scale)+"*v/"+Double.toString(fpk.getMax())+")");
+        fpk.resetMinAndMax();
+        kimage.setProcessor(fpk);
     }
 
     /*
@@ -251,6 +265,18 @@ public class CSI_PAD_Analyzer implements PlugInFilter, MouseListener, MouseMotio
             detectorMethod=comMethod.getSelectedIndex();
             try {updateRealImage();}
             catch (Exception ex) {}
+        }
+    }
+
+    public void stateChanged(ChangeEvent e) {
+        if (e.getSource()==sldLogScale) {
+            if (sldLogScale.getValue()==-10)
+                scale = 0;
+            else
+                scale=Math.exp(sldLogScale.getValue()/10);
+            try {updateKImage();}
+            catch (Exception ex) {}
+
         }
     }
 
