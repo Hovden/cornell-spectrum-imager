@@ -51,11 +51,7 @@ import javax.swing.event.*;
  *   David A. Muller <david.a.muller@cornell.edu>
  *
  * ***** END LICENSE BLOCK ***** */
-<<<<<<< HEAD:src/main/java/com/spectrumimager/CSI/CSI_4D_Analyzer.java
 public class CSI_4D_Analyzer implements PlugInFilter, MouseListener, MouseMotionListener, Measurements, KeyListener, ImageListener, ItemListener, ChangeListener {
-=======
-public class CSI_PAD_Analyzer implements PlugInFilter, MouseListener, MouseMotionListener, Measurements, KeyListener, ImageListener, ItemListener, ChangeListener {
->>>>>>> 17b2fd426a6d49ac4f595b1afad9b914910322fd:src/plugins/CSI/CSI_PAD_Analyzer.java
 
     ImagePlus img; //Image data
     int width, height, zsize, tsize;
@@ -100,10 +96,7 @@ public class CSI_PAD_Analyzer implements PlugInFilter, MouseListener, MouseMotio
         kimage.getWindow().add(slid);
         IJ.run("Out [-]");
         IJ.run("In [+]");
-<<<<<<< HEAD:src/main/java/com/spectrumimager/CSI/CSI_4D_Analyzer.java
 
-=======
->>>>>>> 17b2fd426a6d49ac4f595b1afad9b914910322fd:src/plugins/CSI/CSI_PAD_Analyzer.java
         realimage.show();
         canvasr = realimage.getCanvas();
         realimage.getWindow().add(drop);
@@ -284,10 +277,6 @@ public class CSI_PAD_Analyzer implements PlugInFilter, MouseListener, MouseMotio
                 scale=Math.exp(sldLogScale.getValue()/10);
             try {updateKImage();}
             catch (Exception ex) {}
-<<<<<<< HEAD:src/main/java/com/spectrumimager/CSI/CSI_4D_Analyzer.java
-=======
-
->>>>>>> 17b2fd426a6d49ac4f595b1afad9b914910322fd:src/plugins/CSI/CSI_PAD_Analyzer.java
         }
     }
 
